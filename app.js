@@ -46,8 +46,19 @@ let voiceRingRoomId = null;
 let localVoiceStream = null;
 let voiceIceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
 let selectedChatImage = null;
+let selectedGifId = null;
+let gifCatalog = [];
+let pendingDecorationId = null;
+let pendingPurchaseType = 'decoration';
+let selectedBannerFile = null;
+let bannerPreviewUrl = null;
+let decorationCatalog = [];
+let ownedEffects = ['none'];
+let coinBalance = 0;
 let mentionQueryStart = null;
 let mentionedRoomId = null;
+let typingTimer = null;
+const typingUsers = new Map();
 const voiceConnections = new Map();
 const voiceUsers = new Map();
 
@@ -169,7 +180,7 @@ function renderPeople() {
     host.innerHTML = '<li class="empty-person">No other members yet.</li>';
     return;
   }
-  host.innerHTML = users.map((user) => `<li><button class="person-button${activeContext.type === 'dm' && activeContext.id === user.id ? ' active' : ''}" data-person="${escapeHTML(user.id)}">${avatarMarkup(user)}<span class="person-name">${escapeHTML(user.name)}${badgeMarkup(user)}</span>${onlineIds.includes(user.id) ? '<span class="online-indicator" aria-label="Online"></span>' : ''}</button></li>`).join('');
+  host.innerHTML = users.map((user) => `<li><button class="person-button${activeContext.type === 'dm' && activeContext.id === user.id ? ' active' : ''}" data-person="${escapeHTML(user.id)}">${avatarMarkup(user)}<span class="person-copy"><span class="person-name">${escapeHTML(user.name)}${badgeMarkup(user)}</span><span class="person-status ${onlineIds.includes(user.id) ? 'is-online' : ''}">${onlineIds.includes(user.id) ? 'Online' : 'Offline'}</span></span><span class="person-arrow">›</span></button></li>`).join('');
 }
 
 function renderSidebar() {
@@ -219,7 +230,8 @@ function messagesFor(context = activeContext) {
 
 function avatarMarkup(user, extraClass = '') {
   const photo = user.avatar ? `<img src="${escapeHTML(user.avatar)}" alt="">` : `<span class="avatar-initials">${escapeHTML(initials(user.name))}</span>`;
-  return `<span class="person-avatar avatar-shell ${colorForUser(user.id)} ${extraClass}" data-effect="${escapeHTML(user.avatarEffect || 'none')}">${photo}</span>`;
+  const decoration = user.avatarDecorationUrl ? `<img class="avatar-decoration-overlay" src="${escapeHTML(user.avatarDecorationUrl)}" alt="" loading="lazy">` : '';
+  return `<span class="person-avatar avatar-shell ${colorForUser(user.id)} ${extraClass}" data-effect="${escapeHTML(user.avatarEffect || 'none')}">${photo}${decoration}</span>`;
 }
 
 function badgeMarkup(user) {
@@ -231,6 +243,9 @@ function badgeMarkup(user) {
 
 function renderOwnAvatar(user) {
   const avatar = $('#profileAvatar');
+  const railAvatar = $('#serverProfileButton');
+  if (railAvatar) railAvatar.innerHTML = avatarMarkup(user);
+
   const photo = user.avatar ? `<img src="${escapeHTML(user.avatar)}" alt="">` : `<span class="avatar-initials">${escapeHTML(initials(user.name))}</span>`;
   avatar.innerHTML = photo;
   avatar.dataset.effect = user.avatarEffect || 'none';
@@ -250,7 +265,8 @@ function renderMessage(message, messages) {
       <div class="message-meta"><span class="message-author-group">${author.role === 'system' ? '<span class="message-author">BOT</span>' : `<button class="message-author" data-user="${escapeHTML(author.id)}">${escapeHTML(author.name)}</button>`}${badgeMarkup(author)}</span><span class="message-time">${escapeHTML(time)}</span></div>
       ${reply ? `<blockquote class="reply-quote"><strong>${escapeHTML(reply.user?.name || 'Member')}</strong> &nbsp;${escapeHTML(reply.text.slice(0, 150))}</blockquote>` : ''}
       <p class="message-text">${highlightMentions(message.text)}</p>
-      ${message.attachment?.url ? `<img class="message-image" src="${escapeHTML(message.attachment.url)}" alt="Image shared in chat" loading="lazy">` : ''}
+      ${message.gifUrl ? `<img class="message-image gif-message" src="${escapeHTML(message.gifUrl)}" alt="GIF shared in chat" loading="lazy" decoding="async">` : ''}
+      ${message.attachment?.url ? `<img class="message-image chat-attachment" src="${escapeHTML(message.attachment.url)}" alt="Image shared in chat" loading="lazy" decoding="async" draggable="false" onerror="this.hidden=true">` : ''}
       ${reactionMarkup ? `<div class="message-reactions">${reactionMarkup}</div>` : ''}
     </div>
     <div class="message-actions">
@@ -266,7 +282,7 @@ function renderMessages() {
   const filtered = messages.filter((message) => `${message.user?.name || ''} ${message.text}`.toLowerCase().includes(searchQuery.toLowerCase()));
   const container = $('#messages');
   container.innerHTML = `<div class="date-divider">${activeContext.type === 'room' ? 'ROOM CONVERSATION' : 'DIRECT MESSAGE'}</div>${filtered.length ? filtered.map((message) => renderMessage(message, messages)).join('') : `<p class="empty-state">${searchQuery ? 'No messages match that search.' : 'No messages yet. Start the conversation.'}</p>`}`;
-  container.scrollTop = container.scrollHeight;
+  requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
   refreshIcons();
 }
 
@@ -287,6 +303,26 @@ function joinSocketRoom(eventName, roomId) {
       resolve();
     });
   });
+}
+
+function updateTypingStatus() {
+  let activeTypers = [];
+  if (activeContext.type === 'room') {
+    for (const [key, user] of typingUsers) {
+      if (key.startsWith(`room:${activeContext.id}:`) && user.id !== currentUser.id) activeTypers.push(user);
+    }
+  } else if (activeContext.type === 'dm') {
+    for (const [key, user] of typingUsers) {
+      if (key.startsWith(`dm:${activeContext.id}:`) && user.id !== currentUser.id) activeTypers.push(user);
+    }
+  }
+  activeTypers = [...new Map(activeTypers.map((user) => [user.id, user])).values()];
+  if (!activeTypers.length) {
+    setContextHeader();
+    return;
+  }
+  const names = activeTypers.slice(0, 2).map((user) => user.name).join(' and ');
+  $('#chatSubtitle').textContent = `${names} ${activeTypers.length === 1 ? 'is' : 'are'} typing...`;
 }
 
 function renderOnline() {
@@ -491,12 +527,22 @@ function openVoiceRoom(roomId) {
 
 function openProfile(user) {
   profileUser = user;
+  const banner = $('#modalBanner');
+  if (user.banner) {
+    banner.hidden = false;
+    banner.innerHTML = `<img src="${escapeHTML(user.banner)}" alt="Profile banner" decoding="async">`;
+  } else {
+    banner.hidden = true;
+    banner.innerHTML = '';
+  }
   $('#modalAvatar').innerHTML = avatarMarkup(user, 'profile-avatar-image');
   $('#modalName').textContent = user.name;
   $('#modalBadge').innerHTML = badgeMarkup(user);
   $('#modalBio').textContent = user.bio || 'This person hasn’t added a bio yet.';
   $('#modalError').textContent = '';
   $('#bioEditor').hidden = true;
+  $('#bannerEditor').hidden = true;
+  $('#saveBioButton').hidden = true;
   $('#modalBio').hidden = false;
   $('#profileView').hidden = false;
   $('#customizerView').hidden = true;
@@ -512,10 +558,13 @@ function openProfile(user) {
 }
 
 function renderStudioPreview() {
+  if ($('#coinBalance')) $('#coinBalance').textContent = coinBalance === Infinity ? '∞' : coinBalance.toLocaleString();
+  const selectedDecoration = decorationCatalog.find((decoration) => decoration.id === selectedAvatarEffect);
   const previewUser = {
     ...currentUser,
     avatar: avatarPreviewUrl || currentUser.avatar,
     avatarEffect: selectedAvatarEffect,
+    avatarDecorationUrl: selectedDecoration?.file ? `/${selectedDecoration.route || 'avatar-decorations'}/${encodeURIComponent(selectedDecoration.file)}` : null,
     badge: selectedBadge
   };
   $('#avatarPreview').innerHTML = avatarMarkup(previewUser, 'studio-avatar');
@@ -527,7 +576,73 @@ function renderStudioPreview() {
   });
 }
 
-function openAvatarStudio() {
+async function equipDecoration(effectId) {
+  selectedAvatarEffect = effectId;
+  renderStudioPreview();
+  try {
+    const result = await api('/api/profile', { method: 'PATCH', body: JSON.stringify({ avatarEffect: effectId }) });
+    currentUser = result.user;
+    renderOwnAvatar(currentUser);
+    renderSidebar();
+    renderOnline();
+    renderMessages();
+    showToast(effectId === 'none' ? 'Decoration removed.' : `${decorationCatalog.find((item) => item.id === effectId)?.name || 'Decoration'} equipped.`);
+  } catch (error) { $('#customizerError').textContent = error.message; }
+}
+
+function openDecorationPurchase(effectId) {
+  pendingPurchaseType = 'decoration';
+  pendingDecorationId = effectId;
+  const decoration = decorationCatalog.find((item) => item.id === effectId);
+  const owned = ownedEffects.includes(effectId);
+  const isOwner = currentUser?.role === 'owner';
+  $('#decorationBuyPreview').src = decoration?.file ? `/${decoration.route || 'avatar-decorations'}/${encodeURIComponent(decoration.file)}` : '';
+  $('#decorationBuyPreview').hidden = !decoration?.file;
+  $('#decorationBuyRarity').textContent = decoration?.rarity ? `${decoration.rarity.toUpperCase()} DECORATION` : 'FREE DECORATION';
+  $('#decorationBuyTitle').textContent = decoration?.name || 'Remove decoration';
+  $('#decorationBuyCoins').textContent = isOwner ? '∞ Owner coins' : `Your coins: ${coinBalance.toLocaleString()}`;
+  $('#decorationBuyStatus').textContent = owned || isOwner || effectId === 'none'
+    ? 'Ready to equip on your avatar.'
+    : coinBalance >= decoration.price ? `You can buy this for ${decoration.price} coins.` : `You need ${decoration.price - coinBalance} more coins.`;
+  $('#decorationBuyConfirm').textContent = owned || isOwner || effectId === 'none' ? 'Equip' : coinBalance >= decoration.price ? `Buy · ${decoration.price}` : 'Need coins';
+  $('#decorationBuyConfirm').disabled = !owned && !isOwner && effectId !== 'none' && coinBalance < decoration.price;
+  if (!$('#decorationBuyDialog').open) $('#decorationBuyDialog').showModal();
+}
+
+async function confirmDecorationPurchase() {
+  if (pendingPurchaseType === 'badge') {
+    const badgeId = pendingDecorationId;
+    $('#decorationBuyDialog').close();
+    try {
+      const result = await api('/api/profile', { method: 'PATCH', body: JSON.stringify({ badge: badgeId }) });
+      currentUser = result.user;
+      selectedBadge = badgeId;
+      renderOwnAvatar(currentUser);
+      renderSidebar();
+      renderMessages();
+      showToast(badgeId === 'none' ? 'Badge removed.' : `${badgeLabels[badgeId]} equipped.`);
+    } catch (error) { $('#customizerError').textContent = error.message; }
+    return;
+  }
+  const effectId = pendingDecorationId;
+  if (!effectId) return;
+  const owned = ownedEffects.includes(effectId);
+  const isOwner = currentUser?.role === 'owner';
+  $('#decorationBuyDialog').close();
+  if (effectId === 'none' || owned || isOwner) {
+    await equipDecoration(effectId);
+    return;
+  }
+  try {
+    const result = await api(`/api/avatar-decorations/${encodeURIComponent(effectId)}/buy`, { method: 'POST' });
+    coinBalance = result.user.infiniteCoins ? Infinity : result.user.coins;
+    ownedEffects = result.user.infiniteCoins ? [...new Set([...result.user.ownedEffects, ...decorationCatalog.map((item) => item.id)])] : result.user.ownedEffects;
+    currentUser = result.user;
+    await equipDecoration(effectId);
+  } catch (error) { $('#customizerError').textContent = error.message; }
+}
+
+async function openAvatarStudio() {
   selectedAvatarEffect = currentUser.avatarEffect || 'none';
   selectedBadge = currentUser.badge || 'none';
   selectedAvatarFile = null;
@@ -536,15 +651,32 @@ function openAvatarStudio() {
   $('#customizerError').textContent = '';
   $('#profileView').hidden = true;
   $('#customizerView').hidden = false;
-  $('#effectOptions').innerHTML = Object.entries(effectLabels).map(([effect, label]) => `<button class="effect-option${effect === selectedAvatarEffect ? ' active' : ''}" type="button" data-effect-choice="${effect}"><span class="effect-swatch ${effect}"></span>${label}</button>`).join('');
+  try {
+    const shop = await api('/api/avatar-decorations');
+    decorationCatalog = shop.decorations;
+    coinBalance = shop.infiniteCoins ? Infinity : shop.coins;
+    ownedEffects = shop.infiniteCoins ? [...new Set([...shop.owned, ...shop.decorations.map((decoration) => decoration.id)])] : shop.owned;
+  } catch (error) { $('#customizerError').textContent = error.message; }
+  $('#effectOptions').innerHTML = decorationCatalog.map((decoration) => {
+    const owned = ownedEffects.includes(decoration.id);
+    const active = decoration.id === selectedAvatarEffect;
+    const framePreview = decoration.file ? `<img class="effect-frame-preview" src="/${decoration.route || 'avatar-decorations'}/${encodeURIComponent(decoration.file)}" alt="" loading="lazy" decoding="async">` : `<span class="effect-swatch ${decoration.id}"></span>`;
+    return `<button class="effect-option${active ? ' active' : ''}" type="button" data-effect-choice="${decoration.id}" data-owned="${owned}">${framePreview}<span>${escapeHTML(decoration.name)}</span><small>${owned ? 'Owned' : `${decoration.price} · ${decoration.rarity}`}</small></button>`;
+  }).join('');
   $('#badgeOptions').innerHTML = Object.entries(badgeLabels).map(([badge, label]) => `<button class="badge-option${badge === selectedBadge ? ' active' : ''}" type="button" data-badge-choice="${badge}">${badge === 'none' ? label : `<span class="profile-badge badge-${badge}">${label}</span>`}</button>`).join('');
-  document.querySelectorAll('[data-effect-choice]').forEach((button) => button.addEventListener('click', () => {
-    selectedAvatarEffect = button.dataset.effectChoice;
-    renderStudioPreview();
-  }));
+  document.querySelectorAll('[data-effect-choice]').forEach((button) => button.addEventListener('click', () => openDecorationPurchase(button.dataset.effectChoice)));
   document.querySelectorAll('[data-badge-choice]').forEach((button) => button.addEventListener('click', () => {
-    selectedBadge = button.dataset.badgeChoice;
-    renderStudioPreview();
+    pendingPurchaseType = 'badge';
+    pendingDecorationId = button.dataset.badgeChoice;
+    const badgeId = button.dataset.badgeChoice;
+    $('#decorationBuyPreview').hidden = true;
+    $('#decorationBuyRarity').textContent = 'PROFILE BADGE';
+    $('#decorationBuyTitle').textContent = badgeLabels[badgeId] || 'Badge';
+    $('#decorationBuyCoins').textContent = currentUser?.role === 'owner' ? '∞ Owner coins' : 'Profile badge';
+    $('#decorationBuyStatus').textContent = 'Ready to equip on your name.';
+    $('#decorationBuyConfirm').textContent = 'Equip';
+    $('#decorationBuyConfirm').disabled = false;
+    if (!$('#decorationBuyDialog').open) $('#decorationBuyDialog').showModal();
   }));
   renderStudioPreview();
   refreshIcons();
@@ -568,12 +700,27 @@ function closeProfileDialog() {
 }
 
 function openSocket() {
-  socket = io();
+  socket = io({ reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 500, reconnectionDelayMax: 5000 });
   socket.on('connect', () => {
-    if (activeContext.type === 'room') socket.emit('room:join', activeContext.id);
-    else socket.emit('dm:join', activeContext.id);
+    if (activeContext.type === 'room') socket.emit('room:join', activeContext.id, (result) => { if (result?.error) showToast(result.error); });
+    else if (activeContext.type === 'dm') socket.emit('dm:join', activeContext.id, (result) => { if (result?.error) showToast(result.error); });
+    showToast('Connected live');
   });
+  socket.on('disconnect', () => showToast('Connection lost. Reconnecting...'));
   socket.on('connect_error', () => showToast('Live connection failed. Please sign in again.'));
+  socket.on('user:joined', (user) => {
+    if (user.id === currentUser.id || users.some((entry) => entry.id === user.id)) return;
+    users.push(user);
+    renderSidebar();
+    renderOnline();
+    showToast(`${user.name} joined Chatroom`);
+  });
+  socket.on('typing:update', ({ type, id, user, typing }) => {
+    const key = `${type}:${id}:${user.id}`;
+    if (typing) typingUsers.set(key, user);
+    else typingUsers.delete(key);
+    updateTypingStatus();
+  });
   socket.on('room:message', (message) => {
     const key = `room:${message.roomId}`;
     const list = messageCache.get(key) || [];
@@ -623,6 +770,8 @@ function openSocket() {
     if (profileUser?.id === user.id) {
       profileUser = user;
       $('#modalAvatar').innerHTML = avatarMarkup(user, 'profile-avatar-image');
+      const banner = $('#modalBanner');
+      if (user.banner) { banner.hidden = false; banner.innerHTML = `<img src="${escapeHTML(user.banner)}" alt="Profile banner" decoding="async">`; } else { banner.hidden = true; banner.innerHTML = ''; }
       $('#modalName').textContent = user.name;
       $('#modalBadge').innerHTML = badgeMarkup(user);
       $('#modalBio').textContent = user.bio || 'This person hasn’t added a bio yet.';
@@ -763,8 +912,8 @@ $('#messageForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const input = $('#messageInput');
   const text = input.value.trim();
-  if ((!text && !selectedChatImage) || !socket?.connected) {
-    if (text || selectedChatImage) showToast('Reconnecting. Your message has not been sent.');
+  if ((!text && !selectedChatImage && !selectedGifId) || !socket?.connected) {
+    if (text || selectedChatImage || selectedGifId) showToast('Reconnecting. Your message has not been sent.');
     return;
   }
   if (activeContext.type === 'voice') return;
@@ -783,20 +932,31 @@ $('#messageForm').addEventListener('submit', async (event) => {
       return;
     }
   }
-  const payload = { text, attachmentId, replyTo: replyTarget?.id || null };
+  const payload = { text, attachmentId, gifId: selectedGifId, replyTo: replyTarget?.id || null };
   const eventName = activeContext.type === 'room' ? 'room:send' : 'dm:send';
   if (activeContext.type === 'room') payload.roomId = activeContext.id;
   else payload.peerId = activeContext.id;
   socket.emit(eventName, payload, (result) => {
     if (result?.error) { showToast(result.error); return; }
     input.value = '';
+    clearTimeout(typingTimer);
+    socket.emit('typing:stop', activeContext);
     selectedChatImage = null;
+    selectedGifId = null;
+    $('#gifPicker').hidden = true;
     $('#imageInput').value = '';
     setReply(null);
   });
 });
 
-$('#messageInput').addEventListener('input', updateMentionSuggestions);
+$('#messageInput').addEventListener('input', () => {
+  updateMentionSuggestions();
+  if (!socket?.connected || activeContext.type === 'voice') return;
+  const context = { ...activeContext };
+  socket.emit('typing:start', context);
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(() => socket.emit('typing:stop', context), 1200);
+});
 $('#messageInput').addEventListener('keydown', (event) => {
   if (event.key === 'Escape') $('#mentionSuggestions').hidden = true;
 });
@@ -852,10 +1012,17 @@ $('#messages').addEventListener('click', (event) => {
   }
 });
 
-$('#messages').addEventListener('click', (event) => {
-  const emojiButton = event.target.closest('[data-pick-emoji]');
-  if (!emojiButton) return;
-  socket?.emit('message:react', { messageId: emojiButton.dataset.messageId, emoji: emojiButton.dataset.pickEmoji }, (result) => { if (result?.error) showToast(result.error); });
+$('#workspaceButton').addEventListener('click', () => {
+  $('#channelList')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('#sidebar').classList.remove('open');
+  if (window.innerWidth <= 760) $('#sidebar').classList.add('open');
+});
+
+document.querySelectorAll('a.brand').forEach((brand) => {
+  brand.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (currentUser) openRoom('general');
+  });
 });
 
 $('#newRoomButton').addEventListener('click', async () => {
@@ -876,11 +1043,51 @@ $('#searchButton').addEventListener('click', () => {
 });
 $('#emojiButton').addEventListener('click', () => { $('#messageInput').value += '✨'; $('#messageInput').focus(); });
 $('#imageButton').addEventListener('click', () => $('#imageInput').click());
+$('#gifButton').addEventListener('click', async () => {
+  const picker = $('#gifPicker');
+  picker.hidden = !picker.hidden;
+  if (!picker.hidden) {
+    if (!picker.querySelector('#gifSearch')) picker.innerHTML = '<input id="gifSearch" class="gif-search" type="search" placeholder="Search all GIFs..." autocomplete="off"><div id="gifGrid" class="gif-grid"></div>';
+    try {
+      gifCatalog = (await api('/api/gifs?limit=60')).gifs;
+      renderGifPicker();
+      $('#gifSearch')?.focus();
+    } catch (error) { showToast(error.message); }
+  }
+});
+function renderGifPicker(query = '') {
+  const normalized = query.trim().toLowerCase();
+  const matches = normalized ? gifCatalog.filter((gif) => `${gif.name} ${gif.id}`.toLowerCase().includes(normalized)).slice(0, 120) : gifCatalog.slice(0, 60);
+  $('#gifGrid').innerHTML = matches.length ? matches.map((gif) => `<button type="button" data-gif-id="${escapeHTML(gif.id)}"><img src="${escapeHTML(gif.url)}" alt="${escapeHTML(gif.name)}" loading="lazy" decoding="async"><span>${escapeHTML(gif.name)}</span></button>`).join('') : '<p class="empty-state">No GIFs match that search.</p>';
+}
+let gifSearchTimer;
+$('#gifPicker').addEventListener('input', (event) => {
+  if (event.target.id !== 'gifSearch') return;
+  clearTimeout(gifSearchTimer);
+  const query = event.target.value;
+  if (!query.trim()) {
+    renderGifPicker();
+    return;
+  }
+  gifSearchTimer = setTimeout(async () => {
+    try {
+      gifCatalog = (await api(`/api/gifs?q=${encodeURIComponent(query.trim())}&limit=120`)).gifs;
+      renderGifPicker(query);
+    } catch (error) { showToast(error.message); }
+  }, 180);
+});
+$('#gifPicker').addEventListener('click', (event) => {
+  const option = event.target.closest('[data-gif-id]');
+  if (!option) return;
+  selectedGifId = option.dataset.gifId;
+  $('#gifPicker').hidden = true;
+  $('#messageForm').requestSubmit();
+});
 $('#imageInput').addEventListener('change', () => {
   const file = $('#imageInput').files?.[0];
   if (!file) return;
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
-    showToast('Choose a JPG, PNG, or WebP image up to 5 MB.');
+  if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 50 * 1024 * 1024) {
+    showToast('Choose a JPG, PNG, WebP, or GIF up to 50 MB.');
     $('#imageInput').value = '';
     return;
   }
@@ -891,7 +1098,21 @@ $('#menuButton').addEventListener('click', () => $('#sidebar').classList.add('op
 $('#closeSidebar').addEventListener('click', () => $('#sidebar').classList.remove('open'));
 $('#signOutButton').addEventListener('click', () => leaveChat());
 $('#ownProfileButton').addEventListener('click', () => openProfile(currentUser));
+$('#serverHomeButton').addEventListener('click', () => openRoom('general'));
+$('#serverRoomButton').addEventListener('click', () => {
+  $('#sidebar').classList.toggle('open');
+  if (window.innerWidth > 760) openRoom(activeContext.type === 'room' ? activeContext.id : 'general');
+});
+$('#serverPeopleButton').addEventListener('click', () => {
+  $('#sidebar').classList.add('open');
+  $('#peopleList')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+$('#serverProfileButton').addEventListener('click', () => openProfile(currentUser));
 $('#closeProfile').addEventListener('click', closeProfileDialog);
+$('#closeDecorationBuy').addEventListener('click', () => $('#decorationBuyDialog').close());
+$('#decorationBuyCancel').addEventListener('click', () => $('#decorationBuyDialog').close());
+$('#decorationBuyConfirm').addEventListener('click', confirmDecorationPurchase);
+$('#decorationBuyDialog').addEventListener('click', (event) => { if (event.target === $('#decorationBuyDialog')) $('#decorationBuyDialog').close(); });
 $('#messageUserButton').addEventListener('click', () => {
   if (!profileUser || profileUser.id === currentUser.id) return;
   const peer = profileUser;
@@ -969,8 +1190,8 @@ $('#chooseAvatarButton').addEventListener('click', () => $('#avatarFile').click(
 $('#avatarFile').addEventListener('change', () => {
   const file = $('#avatarFile').files?.[0];
   if (!file) return;
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
-    $('#customizerError').textContent = 'Choose a JPG, PNG, or WebP image up to 5 MB.';
+  if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 50 * 1024 * 1024) {
+    $('#customizerError').textContent = 'Choose a JPG, PNG, WebP, or GIF up to 50 MB.';
     $('#avatarFile').value = '';
     return;
   }
@@ -1020,14 +1241,39 @@ $('#saveAvatarButton').addEventListener('click', async () => {
 $('#editBioButton').addEventListener('click', () => {
   $('#bioEditor').value = currentUser.bio || '';
   $('#bioEditor').hidden = false;
+  $('#bannerEditor').hidden = false;
   $('#modalBio').hidden = true;
   $('#editBioButton').hidden = true;
   $('#customizeAvatarButton').hidden = true;
   $('#messageUserButton').hidden = true;
   $('#saveBioButton').hidden = false;
 });
+$('#chooseBannerButton').addEventListener('click', () => $('#bannerFile').click());
+$('#bannerFile').addEventListener('change', () => {
+  const file = $('#bannerFile').files?.[0];
+  if (!file) return;
+  if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 50 * 1024 * 1024) {
+    $('#modalError').textContent = 'Choose a JPG, PNG, WebP, or GIF banner up to 50 MB.';
+    $('#bannerFile').value = '';
+    return;
+  }
+  if (bannerPreviewUrl) URL.revokeObjectURL(bannerPreviewUrl);
+  selectedBannerFile = file;
+  bannerPreviewUrl = URL.createObjectURL(file);
+  $('#modalBanner').hidden = false;
+  $('#modalBanner').innerHTML = `<img src="${escapeHTML(bannerPreviewUrl)}" alt="Banner preview">`;
+  $('#modalError').textContent = '';
+});
 $('#saveBioButton').addEventListener('click', async () => {
   try {
+    if (selectedBannerFile) {
+      const upload = await api('/api/banner', { method: 'POST', headers: { 'Content-Type': selectedBannerFile.type }, body: selectedBannerFile });
+      currentUser = upload.user;
+      selectedBannerFile = null;
+      if (bannerPreviewUrl) URL.revokeObjectURL(bannerPreviewUrl);
+      bannerPreviewUrl = null;
+      $('#bannerEditor').hidden = true;
+    }
     const result = await api('/api/profile', { method: 'PATCH', body: JSON.stringify({ bio: $('#bioEditor').value }) });
     currentUser = result.user;
     renderOwnAvatar(currentUser);

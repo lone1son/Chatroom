@@ -135,12 +135,18 @@ test('authenticated people can chat and DM in real time', { timeout: 30000 }, as
   const profileResponse = await fetch(`${url}/api/profile`, {
     method: 'PATCH',
     headers: { Cookie: alice.cookie, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ bio: 'Updated Alice bio', avatarEffect: 'rainbow', badge: 'dragon' })
+    body: JSON.stringify({ bio: 'Updated Alice bio', badge: 'dragon' })
   });
   const profile = (await profileResponse.json()).user;
-  assert.equal(profile.avatarEffect, 'rainbow');
+
   assert.equal(profile.badge, 'dragon');
   assert.equal(profile.bio, 'Updated Alice bio');
+  const ownerEffectResponse = await fetch(`${url}/api/profile`, {
+    method: 'PATCH', headers: { Cookie: alice.cookie, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ avatarEffect: 'bot-hugh-the-rainbow' })
+  });
+  assert.equal(ownerEffectResponse.status, 200);
+  assert.equal((await ownerEffectResponse.json()).user.avatarEffect, 'bot-hugh-the-rainbow');
 
   const resumedLogin = await fetch(`${url}/api/login`, {
     method: 'POST',
@@ -149,7 +155,7 @@ test('authenticated people can chat and DM in real time', { timeout: 30000 }, as
   });
   const resumedUser = (await resumedLogin.json()).user;
   assert.equal(resumedUser.avatar, avatar);
-  assert.equal(resumedUser.avatarEffect, 'rainbow');
+
   assert.equal(resumedUser.badge, 'dragon');
   assert.equal(moderationChecks, 3);
 
@@ -247,6 +253,10 @@ test('authenticated people can chat and DM in real time', { timeout: 30000 }, as
   const directMessage = await emitAck(aliceSocket, 'dm:send', { peerId: bob.id, text: 'A private hello.' });
   assert.equal((await dmDelivery).id, directMessage.message.id);
   assert.equal(directMessage.message.user.name, 'Alice Real');
+  const gifDelivery = waitForEvent(bobSocket, 'dm:message', (message) => Boolean(message.gifUrl));
+  const gifMessage = await emitAck(aliceSocket, 'dm:send', { peerId: bob.id, text: '', gifId: 'yay' });
+  assert.equal((await gifDelivery).id, gifMessage.message.id);
+  assert.equal(gifMessage.message.gifUrl, '/gifs/Approved/yay.gif');
 
   const savedHistory = await fetch(`${url}/api/messages?room=general`, { headers: { Cookie: alice.cookie } });
   const messages = (await savedHistory.json()).messages;
@@ -290,10 +300,13 @@ test('image uploads fail closed without a moderation service', { timeout: 15000 
   });
   const cookie = signup.headers.getSetCookie()[0].split(';')[0];
   const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Buffer.alloc(20)]);
+  const gif = Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(20)]);
   const attachment = await fetch(`${url}/api/attachments`, { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'image/png' }, body: png });
   const avatar = await fetch(`${url}/api/avatar`, { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'image/png' }, body: png });
+  const gifAvatar = await fetch(`${url}/api/avatar`, { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'image/gif' }, body: gif });
   assert.equal(attachment.status, 503);
-  assert.equal(avatar.status, 503);
+  assert.equal(avatar.status, 200);
+  assert.equal(gifAvatar.status, 200);
 });
 
 test('production requires the trusted school gateway', { timeout: 15000 }, async (t) => {

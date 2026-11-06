@@ -168,8 +168,16 @@
       .details-panel { display: none; }
     }
     @media (max-width: 760px) {
-      .app-shell { position: relative; grid-template-columns: 1fr; min-height: 0; height: 100dvh; }
-      .sidebar { position: absolute; z-index: 5; top: 0; bottom: 0; left: 0; width: min(82vw, 280px); box-shadow: 12px 0 35px #0009; transform: translateX(-105%); transition: transform .22s ease; }
+      .app-shell { position: relative; grid-template-columns: 58px 1fr; min-height: 0; height: 100dvh; }
+      .server-rail { grid-column: 1; grid-row: 1; padding: 10px 5px; }
+      .server-mark, .server-button { width: 42px; height: 42px; flex-basis: 42px; border-radius: 13px; }
+      .server-mark { font-size: 17px; }
+      .server-divider { width: 28px; }
+      .sidebar { position: absolute; z-index: 5; top: 0; bottom: 0; left: 58px; width: min(78vw, 280px); box-shadow: 12px 0 35px #0009; transform: translateX(-115%); transition: transform .22s ease; }
+      .sidebar.open { transform: translateX(0); }
+      .chat-main { grid-column: 2; }
+      .details-panel { display: none !important; }
+      .sidebar-brand-row { height: 60px; }
       .sidebar.open { transform: translateX(0); }
       .mobile-menu { display: grid; }
       .chat-header { height: 60px; flex-basis: 60px; padding: 0 12px; }
@@ -245,6 +253,16 @@
     .modal { width: min(420px, calc(100% - 32px)); max-height: calc(100dvh - 28px); padding: 0; overflow: auto; border: 1px solid #ffffff25; border-radius: 10px; background: #141619; color: #f4f5f6; box-shadow: 0 30px 90px #000b; }
     .modal-content { padding: 24px; }
     .modal-close { float: right; }
+    .modal-banner { width: calc(100% + 40px); height: 140px; margin: -20px -20px 14px; overflow: hidden; border-bottom: 1px solid #ffffff1a; background: #ffffff08 center/cover no-repeat; }
+    .modal-banner img { width: 100%; height: 100%; display: block; object-fit: cover; }
+    #modalBanner { position: relative; }
+    #modalBanner::after { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,.38)); content: ''; pointer-events: none; }
+    animate-icons { display: inline-grid; width: 17px; height: 17px; place-items: center; }
+    animate-icons svg { width: 100%; height: 100%; }
+    button:hover animate-icons { transform: scale(1.06); }
+    #modalBanner { position: relative; }
+    #modalBanner::after { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, .38)); content: ''; pointer-events: none; }
+    .banner-editor { margin-bottom: 12px; }
     .modal-avatar { width: 76px; height: 76px; display: grid; place-items: center; margin: 4px 0 16px; border: 1px solid #ffffff25; border-radius: 50%; background: #ffffff12; color: #d8ff64; font: 600 18px 'Space Grotesk', sans-serif; }
     .modal-avatar .person-avatar { width: 66px; height: 66px; flex-basis: 66px; font-size: 16px; }
     .modal-name { margin-bottom: 6px; font: 600 22px 'Space Grotesk', sans-serif; }
@@ -302,7 +320,9 @@
     .field textarea { width: 100%; min-height: 66px; padding: 12px 14px; resize: vertical; border: 1px solid #ffffff24; border-radius: 6px; background: #ffffff0a; color: #f4f5f6; font: inherit; }
     .avatar-shell { position: relative; isolation: isolate; overflow: visible; }
     .avatar-shell::after { display: none; }
-    .avatar-shell img { display: block; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+    .avatar-shell img:not(.avatar-decoration-overlay) { display: block; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+    .avatar-decoration-overlay { position: absolute; z-index: 4; inset: -23%; width: 146%; height: 146%; max-width: none; border-radius: 0 !important; object-fit: contain; pointer-events: none; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .35)); }
+    .profile-avatar .avatar-decoration-overlay { inset: -24%; }
     .avatar-initials { display: grid; width: 100%; height: 100%; place-items: center; }
     .avatar-shell[data-effect="glow"] { outline: 1px solid #d8ff64; box-shadow: 0 0 13px #d8ff6480; }
     .avatar-shell[data-effect="aurora"] { outline: 2px solid #6be9bd; box-shadow: 0 0 6px #6be9bd, 0 0 17px #68bbef88; }
@@ -332,6 +352,22 @@
     @keyframes avatarElectric { 50% { box-shadow: 0 0 14px #74f5ff, 0 0 34px #35bfff; } }
     @keyframes avatarGlitch { 50% { transform: translateX(1px); filter: hue-rotate(35deg); } }
     @keyframes avatarRainbow { to { filter: hue-rotate(360deg); } }
+    .avatar-shell[data-effect="aurora"]::before,
+    .avatar-shell[data-effect="cosmic"]::before,
+    .avatar-shell[data-effect="hologram"]::before,
+    .avatar-shell[data-effect="prism"]::before,
+    .avatar-shell[data-effect="rainbow"]::before { position: absolute; inset: -8px; border: 2px solid transparent; border-top-color: currentColor; border-radius: 50%; content: ''; pointer-events: none; animation: avatarOrbit 4s linear infinite; }
+    .avatar-shell[data-effect="aurora"]::before { color: #6be9bd; box-shadow: inset 5px 0 9px #68bbef88; }
+    .avatar-shell[data-effect="cosmic"]::before { color: #ce9bff; box-shadow: inset -5px 0 9px #8155e7; }
+    .avatar-shell[data-effect="hologram"]::before { color: #83f6dc; border-right-color: #ff91d2; border-bottom-color: #83f6dc; }
+    .avatar-shell[data-effect="prism"]::before { color: #8eebff; border-right-color: #d493ff; border-bottom-color: #ff9ac8; }
+    .avatar-shell[data-effect="rainbow"]::before { color: #ff71cb; border-right-color: #65eaff; border-bottom-color: #ffe66d; }
+    .avatar-shell[data-effect="glow"]::before,
+    .avatar-shell[data-effect="halo"]::before,
+    .avatar-shell[data-effect="gold"]::before { position: absolute; inset: -6px; border-radius: 50%; content: ''; pointer-events: none; }
+    .avatar-shell[data-effect="glow"]::before { border: 1px solid #d8ff64; }
+    .avatar-shell[data-effect="halo"]::before { border: 2px solid #ffe27a; box-shadow: 0 -2px 12px #ffad4f; }
+    .avatar-shell[data-effect="gold"]::before { border: 2px dotted #ffe08a; animation: avatarOrbit 12s linear infinite; }
     .profile-badge { display: inline-flex; align-items: center; min-height: 17px; margin-left: 6px; padding: 2px 7px; border-radius: 10px; background: #d8ff64; color: #11150b; font-size: 8px; font-weight: 800; line-height: 1; text-transform: uppercase; vertical-align: middle; }
     #profileBadge .profile-badge { margin: 3px 0 0; min-height: 14px; padding: 2px 6px; font-size: 7px; }
     .badge-none { display: none; }
@@ -389,10 +425,19 @@
     .upload-button svg { width: 16px; height: 16px; color: #d8ff64; }
     .upload-hint { margin: 6px 0 16px; color: #858c94; font-size: 10px; text-align: center; }
     .studio-section-title { margin: 14px 0 8px; color: #d9dcdf; font-size: 11px; }
+    .coin-balance { margin: 4px 0 0; color: #ffe08a; font-size: 11px; font-weight: 800; }
     .effect-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-    .effect-option { min-width: 0; display: grid; justify-items: center; gap: 6px; padding: 8px 3px; border: 1px solid #ffffff20; border-radius: 6px; background: #ffffff08; color: #b7bdc3; font-size: 8px; cursor: pointer; }
+    .effect-option { min-width: 0; display: grid; justify-items: center; gap: 4px; padding: 8px 3px; border: 1px solid #ffffff20; border-radius: 8px; background: #ffffff08; color: #b7bdc3; font-size: 8px; cursor: pointer; }
+    .effect-option small { width: 100%; min-height: 16px; overflow: hidden; color: #ffe08a; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
     .effect-option.active { border-color: #d8ff6480; background: #d8ff6417; color: #edffd0; }
     .effect-swatch { width: 23px; height: 23px; border: 2px solid #8a9297; border-radius: 50%; }
+    .effect-frame-preview { width: 44px; height: 44px; border-radius: 50%; object-fit: contain; filter: drop-shadow(0 2px 5px rgba(0, 0, 0, .55)); }
+    .decoration-buy-content { text-align: center; }
+    .decoration-buy-preview { width: 150px; height: 150px; margin: 8px auto 14px; object-fit: contain; filter: drop-shadow(0 8px 22px rgba(0, 0, 0, .55)); }
+    .decoration-buy-coins { margin: 10px 0 6px; color: #ffe08a; font-weight: 800; }
+    .decoration-buy-status { min-height: 20px; margin: 0 0 14px; color: #cbd0d5; font-size: 12px; }
+    .decoration-buy-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .decoration-buy-actions button { width: 100%; min-height: 44px; border-radius: 10px !important; }
     .effect-swatch.glow { border-color: #d8ff64; box-shadow: 0 0 8px #d8ff64; }
     .effect-swatch.aurora { border-color: #6be9bd; box-shadow: 0 0 6px #6be9bd, 0 0 10px #68bbef; }
     .effect-swatch.frost { border-color: #b8eaff; box-shadow: 0 0 8px #a4dfff; }
@@ -567,7 +612,15 @@
     .voice-actions button, .voice-notice button, .mute-profile-actions button { min-height: 40px; padding: 0 14px; }
     .voice-notice { position: fixed; right: 18px; bottom: 18px; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #fff; background: #000; color: #fff; }
     .voice-notice button { min-height: 34px; padding: 0 9px; }
-    .message-image { display: block; width: min(460px, 100%); max-height: 340px; margin-top: 9px; border: 1px solid #fff; object-fit: contain; }
+    .message-image { display: block; width: min(460px, 100%); max-width: 100%; max-height: 340px; margin-top: 9px; border: 1px solid #fff; object-fit: contain; overflow: hidden; }
+    .chat-attachment { width: auto; height: auto; max-width: min(460px, 100%); max-height: 420px; aspect-ratio: auto; }
+    .gif-picker { position: absolute; right: 22px; bottom: 78px; left: 22px; z-index: 12; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; max-height: 260px; overflow: auto; padding: 8px; border: 1px solid #ffffff35; border-radius: 10px; background: #17191df7; box-shadow: 0 16px 38px #000b; }
+    .gif-picker[hidden] { display: none; }
+    .gif-picker button { min-width: 0; padding: 5px; border: 1px solid #ffffff20; border-radius: 8px; background: #ffffff08; color: #fff; cursor: pointer; }
+    .gif-picker img { display: block; width: 100%; height: 82px; border-radius: 5px; object-fit: cover; }
+    .gif-search { grid-column: 1 / -1; width: 100%; height: 38px; padding: 0 10px; border: 1px solid #ffffff30; border-radius: 8px; background: #0d0f12; color: #fff; outline: none; }
+    .gif-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .gif-picker button span { display: block; margin-top: 4px; overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
     .brand, .brand:visited { color: #fff; text-decoration: none; }
     .profile-badge {
       position: relative;
@@ -594,6 +647,59 @@
       to { box-shadow: 0 0 0 1px #ffffff99, 0 0 18px #ad78ffbb, 0 0 25px #54dfff66; }
     }
     @keyframes swatchBreathe { to { transform: scale(1.1); filter: brightness(1.35); } }
+    .app-shell { grid-template-columns: 68px 236px minmax(360px, 1fr) 224px; }
+    .server-rail { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; padding: 14px 8px; border-right: 1px solid #ffffff16; background: #08090b; }
+    .server-mark { position: relative; width: 48px; height: 48px; display: grid; place-items: center; flex: 0 0 48px; border: 0; border-radius: 16px; background: #d8ff64; color: #0d1009; font: 800 20px 'Space Grotesk', sans-serif; cursor: pointer; transition: border-radius .18s ease, transform .18s ease; }
+    .server-mark:hover, .server-mark.active { border-radius: 12px; transform: translateY(-1px); }
+    .server-divider { width: 34px; height: 1px; margin: 2px 0; background: #ffffff18; }
+    .server-button { width: 48px; height: 48px; display: grid; place-items: center; flex: 0 0 48px; border: 1px solid #ffffff24; border-radius: 16px; background: #17191c; color: #dce0e4; font: 700 17px 'Space Grotesk', sans-serif; cursor: pointer; transition: border-radius .18s ease, background .18s ease, color .18s ease, transform .18s ease; }
+    .server-button:hover, .server-button.active { border-radius: 12px; background: #d8ff64; color: #10130c; transform: translateY(-1px); }
+    .server-button i { font-size: 17px; }
+    .server-button.people-button { font-size: 15px; }
+    .server-rail .server-avatar { margin-top: auto; width: 42px; height: 42px; display: grid; place-items: center; flex: 0 0 42px; border: 0; border-radius: 50%; background: transparent; overflow: visible; cursor: pointer; }
+    .sidebar { border-right: 1px solid #ffffff16; }
+    .sidebar-brand-row { height: 64px; padding: 0 10px; border-bottom: 1px solid #ffffff16; }
+    .sidebar-scroll { padding-top: 12px; }
+    .side-label { margin: 10px 7px 7px; font-size: 9px; color: #9299a3; }
+    .channel-button { min-height: 38px; border: 0; border-radius: 4px; padding: 0 8px; }
+    .channel-button.active { border: 0; background: #ffffff14; color: #fff; }
+    .person-button { position: relative; min-height: 44px; padding: 5px 9px; }
+    .person-button .person-avatar { width: 30px; height: 30px; flex-basis: 30px; }
+    .person-button .person-avatar::after { display: none; }
+    .person-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .person-name { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; }
+    .person-status { color: #777e88; font-size: 9px; }
+    .person-status.is-online { color: #43b581; }
+    .person-arrow { color: #777e88; font-size: 18px; opacity: 0; transform: translateX(-4px); transition: .16s ease; }
+    .person-button:hover .person-arrow, .person-button.active .person-arrow { opacity: 1; transform: translateX(0); }
+    .auth-switch .text-button { min-height: 40px; margin-left: 5px; padding: 8px 12px; border: 1px solid #ffffff2e; border-radius: 10px; }
+    button, .primary-button, .icon-button, .text-button, .back-link, .send-button, .workspace-button, .channel-button, .person-button, .reaction, .upload-button, .effect-option, .badge-option {
+      line-height: 1.2;
+      text-align: center;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .primary-button, .send-button.has-label, .voice-actions button, .link-warning-actions button, .modal-actions button {
+      min-height: 44px;
+      height: auto;
+      padding-block: 10px;
+    }
+    .primary-button i, .primary-button svg, .send-button i, .send-button svg, .modal-actions i, .modal-actions svg, .voice-actions i, .voice-actions svg {
+      flex: 0 0 auto;
+    }
+    @media (max-width: 1120px) {
+      .app-shell { grid-template-columns: 68px 236px minmax(360px, 1fr); }
+      .details-panel { display: none !important; }
+    }
+    @media (max-width: 760px) {
+      .auth-shell { grid-template-columns: 1fr; min-height: 100dvh; }
+      .auth-main { min-height: 100dvh; padding: 24px 20px 20px; }
+      .auth-content { width: 100%; max-width: 440px; margin: 24px auto; padding: 20px 0; }
+      .auth-aside { min-height: 220px; }
+      .primary-button { width: 100%; min-height: 48px; padding: 12px 16px; }
+      .auth-switch { line-height: 1.7; }
+      .auth-switch button { min-height: 38px; padding: 5px 6px; }
+    }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
     }
@@ -607,12 +713,12 @@
         <span class="step-label"><span class="step-dot"></span> REAL PEOPLE. REAL-TIME.</span>
         <h1>Your people,<br>in one place.</h1>
         <p class="auth-copy">A private room for conversations that are better shared. Create an account and bring your voice in.</p>
-        <button id="startSignup" class="primary-button">Create your account <i data-lucide="arrow-right"></i></button>
-        <p class="auth-switch">Already have an account? <button id="welcomeLogin" class="text-button">Sign in</button></p>
+        <button id="startSignup" class="primary-button" type="button">Create your account <i data-lucide="arrow-right"></i></button>
+        <p class="auth-switch">Already have an account? <button id="welcomeLogin" class="text-button" type="button">Sign in</button></p>
         <div class="auth-note"><i data-lucide="lock-keyhole"></i> No bots. Just people.</div>
       </div>
       <div id="createScreen" class="auth-content" hidden>
-        <button id="backWelcome" class="back-link"><i data-lucide="arrow-left"></i> Back</button>
+        <button id="backWelcome" class="back-link" type="button"><i data-lucide="arrow-left"></i> Back</button>
         <span class="step-label"><span class="step-dot"></span> A GOOD PLACE TO START</span>
         <h1 id="formTitle">Create your account.</h1>
         <p id="formCopy" class="auth-copy">Create your account and join the conversation.</p>
@@ -649,21 +755,27 @@
           </section>
         </div>
       </div>
-      <div class="aside-footer"><span>REAL PEOPLE / PRIVATE ROOMS</span><span>CHATROOM</span></div>
     </aside>
   </main>
 
   <main id="appShell" class="app-shell" hidden>
+    <aside class="server-rail" aria-label="Chatroom navigation">
+      <button id="serverHomeButton" class="server-mark active" aria-label="Open general room">C</button>
+      <span class="server-divider"></span>
+      <button id="serverRoomButton" class="server-button active" aria-label="Open rooms"><span>#</span></button>
+      <button id="serverPeopleButton" class="server-button people-button" aria-label="View people"><i class="fa-solid fa-users"></i></button>
+      <button id="serverProfileButton" class="server-avatar" aria-label="Open your profile"></button>
+    </aside>
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-brand-row">
         <a class="brand" href="#" aria-label="Chatroom home"><span class="brand-mark"><i data-lucide="messages-square"></i></span><span>Chatroom</span></a>
-        <button id="closeSidebar" class="icon-button has-label" aria-label="Close navigation"><i data-lucide="panel-left-close"></i><span class="button-label">Hide</span></button>
+        <button id="closeSidebar" class="icon-button has-label" type="button" aria-label="Close navigation"><i data-lucide="panel-left-close"></i><span class="button-label">Hide</span></button>
       </div>
-      <button class="workspace-button" aria-label="Current workspace">
+      <button id="workspaceButton" class="workspace-button" type="button" aria-label="Open workspace rooms">
         <span class="workspace-logo">C</span><span class="workspace-details"><span class="workspace-name">Chatroom</span><span class="workspace-sub">Real people, live</span></span><span class="button-label">Change</span>
       </button>
       <div class="sidebar-scroll">
-        <div class="side-label">Your rooms <button id="newRoomButton" class="icon-button has-label" aria-label="Create a room"><i data-lucide="plus"></i><span class="button-label">Add</span></button></div>
+        <div class="side-label">Your rooms <button id="newRoomButton" class="icon-button has-label" aria-label="Create a room"><animate-icons name="plus" size="17" color="currentColor"></animate-icons><span class="button-label">Add</span></button></div>
         <ul id="channelList" class="nav-list"></ul>
         <div class="side-label section-gap">Your people</div>
         <ul id="peopleList" class="nav-list"></ul>
@@ -671,13 +783,13 @@
         <ul id="voiceList" class="nav-list"></ul>
       </div>
       <button id="ownProfileButton" class="profile-row profile-trigger"><span id="profileAvatar" class="profile-avatar">C</span><span class="profile-copy"><span id="profileName" class="profile-name">Your profile</span><span id="profileBadge"></span><span class="profile-status"><span></span> Your account</span></span></button>
-      <button id="signOutButton" class="icon-button signout-button" aria-label="Sign out" title="Sign out"><i data-lucide="log-out"></i><span>Sign out</span></button>
+      <button id="signOutButton" class="icon-button signout-button" aria-label="Sign out" title="Sign out"><animate-icons name="log-out" size="17" color="currentColor"></animate-icons><span>Sign out</span></button>
     </aside>
     <section class="chat-main">
       <header class="chat-header">
         <button id="menuButton" class="icon-button has-label mobile-menu" aria-label="Open navigation"><i data-lucide="panel-left-open"></i><span class="button-label">Menu</span></button>
         <div class="chat-title-wrap"><h1 id="chatTitle" class="chat-title"><span>#</span> general</h1><p id="chatSubtitle" class="chat-subtitle">The place for everything that doesn't have a place.</p></div>
-        <div class="header-actions"><div id="memberStack" class="member-stack" aria-label="Online users"></div><span class="header-divider"></span><button id="searchButton" class="icon-button has-label" aria-label="Search messages"><i data-lucide="search"></i><span class="button-label">Search</span></button></div>
+        <div class="header-actions"><div id="memberStack" class="member-stack" aria-label="Online users"></div><span class="header-divider"></span><button id="searchButton" class="icon-button has-label" aria-label="Search messages"><animate-icons name="search" size="17" color="currentColor"></animate-icons><span class="button-label">Search</span></button></div>
       </header>
       <section id="voicePanel" class="voice-panel" hidden>
         <h2>Voice Room</h2>
@@ -687,7 +799,7 @@
         <div id="remoteAudios"></div>
       </section>
       <section id="messages" class="messages" aria-live="polite" aria-label="Room messages"></section>
-      <div id="composerWrap" class="composer-wrap"><div id="mentionSuggestions" class="mention-suggestions" role="listbox" aria-label="Mention a person" hidden></div><div id="replyPreview" class="reply-preview" hidden></div><form id="messageForm" class="composer"><input id="messageInput" autocomplete="off" aria-label="Write a message" placeholder="Message # general"><div class="composer-tools"><div class="tool-row"><button type="button" class="icon-button has-label" aria-label="Add emoji" id="emojiButton"><i data-lucide="smile"></i><span class="button-label">Emoji</span></button><button type="button" class="icon-button has-label" id="imageButton"><i class="fa-solid fa-image"></i><span class="button-label">Image</span></button><input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><button class="send-button has-label" type="submit" aria-label="Send message"><i data-lucide="arrow-up"></i><span class="button-label">Send</span></button></div></form><p class="composer-hint">Only signed-in people can read and write here.</p></div>
+      <div id="composerWrap" class="composer-wrap"><div id="gifPicker" class="gif-picker" hidden></div><div id="mentionSuggestions" class="mention-suggestions" role="listbox" aria-label="Mention a person" hidden></div><div id="replyPreview" class="reply-preview" hidden></div><form id="messageForm" class="composer"><input id="messageInput" autocomplete="off" aria-label="Write a message" placeholder="Message # general"><div class="composer-tools"><div class="tool-row"><button type="button" class="icon-button has-label" aria-label="Add emoji" id="emojiButton"><i data-lucide="smile"></i><span class="button-label">Emoji</span></button><button type="button" class="icon-button has-label" id="gifButton"><i class="fa-solid fa-film"></i><span class="button-label">GIF</span></button><button type="button" class="icon-button has-label" id="imageButton"><i class="fa-solid fa-image"></i><span class="button-label">Image</span></button><input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></div><button class="send-button has-label" type="submit" aria-label="Send message"><animate-icons name="send" size="17" color="currentColor"></animate-icons><span class="button-label">Send</span></button></div></form><p class="composer-hint">Only signed-in people can read and write here.</p></div>
     </section>
     <aside class="details-panel"><h2 class="details-heading">Room details</h2><section class="details-section"><h3 class="details-section-title">Online now <span id="onlineCount">0</span></h3><div id="onlineMembers"></div></section><section class="details-section"><h3 class="details-section-title">People in Chatroom</h3><p id="peopleSummary" class="room-footer">Registered members appear here.</p></section><p class="room-footer">Private conversations, shared in real time.</p></aside>
   </main>
@@ -698,11 +810,17 @@
     <div class="modal-content">
       <button id="closeProfile" class="icon-button has-label modal-close" aria-label="Close profile"><i data-lucide="x"></i><span class="button-label">Close</span></button>
       <section id="profileView">
+        <div id="modalBanner" class="modal-banner" hidden></div>
         <div id="modalAvatar" class="modal-avatar"></div>
         <h2 id="modalName" class="modal-name"></h2>
         <div id="modalBadge"></div>
         <p id="modalBio" class="modal-bio"></p>
         <textarea id="bioEditor" class="bio-editor" maxlength="240" placeholder="A little about you..." hidden></textarea>
+        <div id="bannerEditor" class="banner-editor" hidden>
+          <input id="bannerFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+          <button id="chooseBannerButton" class="upload-button" type="button"><i data-lucide="image-plus"></i> Set banner image or GIF</button>
+          <p class="upload-hint">Up to 50 MB · JPG, PNG, WebP, or GIF</p>
+        </div>
         <p id="modalError" class="form-error" role="alert"></p>
         <div class="modal-actions">
           <button id="messageUserButton" class="primary-button" type="button"><i data-lucide="message-circle"></i> Message</button>
@@ -714,10 +832,10 @@
       </section>
       <section id="customizerView" class="customizer-view" hidden>
         <button id="backToProfile" class="back-link"><i data-lucide="arrow-left"></i> Profile</button>
-        <div class="customizer-heading"><div><p class="art-kicker">MAKE IT YOURS</p><h2>Avatar studio</h2></div><div id="avatarPreview" class="avatar-preview-large"></div></div>
-        <input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp" hidden>
-        <button id="chooseAvatarButton" class="upload-button" type="button"><i data-lucide="image-up"></i> Choose photo from device</button>
-        <p class="upload-hint">JPG, PNG, or WebP · up to 5 MB</p>
+        <div class="customizer-heading"><div><p class="art-kicker">MAKE IT YOURS</p><h2>Avatar studio</h2><p class="coin-balance"><span id="coinBalance">0</span> coins</p></div><div id="avatarPreview" class="avatar-preview-large"></div></div>
+        <input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+        <button id="chooseAvatarButton" class="upload-button" type="button"><i data-lucide="image-up"></i> Choose photo or GIF from device</button>
+        <p class="upload-hint">JPG, PNG, WebP, or GIF · up to 50 MB</p>
         <h3 class="studio-section-title">Effects</h3>
         <div id="effectOptions" class="effect-options"></div>
         <h3 class="studio-section-title">Name badge</h3>
@@ -725,6 +843,20 @@
         <p id="customizerError" class="form-error" role="alert"></p>
         <button id="saveAvatarButton" class="primary-button" type="button">Save look</button>
       </section>
+    </div>
+  </dialog>
+  <dialog id="decorationBuyDialog" class="modal" aria-labelledby="decorationBuyTitle">
+    <div class="modal-content decoration-buy-content">
+      <button id="closeDecorationBuy" class="icon-button modal-close" type="button" aria-label="Close">×</button>
+      <img id="decorationBuyPreview" class="decoration-buy-preview" alt="">
+      <p id="decorationBuyRarity" class="art-kicker">RARITY</p>
+      <h2 id="decorationBuyTitle" class="modal-name">Avatar decoration</h2>
+      <p id="decorationBuyCoins" class="decoration-buy-coins">Your coins: 0</p>
+      <p id="decorationBuyStatus" class="decoration-buy-status"></p>
+      <div class="decoration-buy-actions">
+        <button id="decorationBuyCancel" class="icon-button" type="button">Cancel</button>
+        <button id="decorationBuyConfirm" class="primary-button" type="button">Buy</button>
+      </div>
     </div>
   </dialog>
   <dialog id="linkWarningDialog" class="modal" aria-labelledby="linkWarningTitle">
@@ -740,7 +872,7 @@
   </dialog>
   <div id="toast" class="toast" role="status" hidden></div>
   <script src="/socket.io/socket.io.js"></script>
-
+  <script src="/vendor/animateicons-lucide.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
