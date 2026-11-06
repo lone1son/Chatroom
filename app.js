@@ -20,6 +20,19 @@ const badgeLabels = {
   artist: 'Artist', creator: 'Creator', gamer: 'Gamer', music: 'Music Lover', bookworm: 'Bookworm', 'night-owl': 'Night Owl', helper: 'Helper', trailblazer: 'Trailblazer', dreamer: 'Dreamer', explorer: 'Explorer', legend: 'Legend', stargazer: 'Stargazer', 'good-vibes': 'Good Vibes', 'plant-parent': 'Plant Parent', 'pixel-pro': 'Pixel Pro', 'cozy-core': 'Cozy Core', comet: 'Comet', moonbeam: 'Moonbeam', sunshine: 'Sunshine', vivid: 'Vivid', 'tiny-chaos': 'Tiny Chaos', 'team-player': 'Team Player', maker: 'Maker', storyteller: 'Storyteller', 'early-bird': 'Early Bird',
   dragon: 'Dragon', angel: 'Angel', raver: 'Raver', builder: 'Builder', rocket: 'Rocket', spectral: 'Spectral', spark: 'Spark', flower: 'Flower', wizard: 'Wizard', 'sun-chaser': 'Sun Chaser',
 };
+const spookyAdjectives = [
+  'Phantom', 'Cursed', 'Haunted', 'Midnight', 'Cryptic', 'Eerie', 'Bloodmoon', 'Shadow', 'Sinister', 'Graveyard',
+  'Vampire', 'Witchbound', 'Zombie', 'Spectral', 'Dread', 'Hollow', 'Darkwood', 'Moonlit', 'Creeping', 'Ghostly'
+];
+const spookySubjects = [
+  'Whisper', 'Lantern', 'Reaper', 'Skull', 'Wraith', 'Werewolf', 'Bat', 'Spirit', 'Pumpkin', 'Raven',
+  'Candle', 'Crypt', 'Fang', 'Tomb', 'Hound', 'Fog', 'Mirror', 'Bell', 'Hex', 'Nightmare'
+];
+for (let badgeNumber = 1; badgeNumber <= 300; badgeNumber++) {
+  const adjective = spookyAdjectives[(badgeNumber - 1) % spookyAdjectives.length];
+  const subject = spookySubjects[Math.floor((badgeNumber - 1) / spookyAdjectives.length) % spookySubjects.length];
+  badgeLabels[`animated-${String(badgeNumber).padStart(3, '0')}`] = `${adjective} ${subject} ${badgeNumber}`;
+}
 const effectLabels = {
   none: 'None', glow: 'Glow', aurora: 'Aurora', frost: 'Frost', sparkle: 'Sparkle', sunset: 'Sunset', neon: 'Neon', rose: 'Rose', ocean: 'Ocean', ember: 'Ember', cosmic: 'Cosmic', hologram: 'Hologram', midnight: 'Midnight', gold: 'Gold', prism: 'Prism', pulse: 'Pulse', orbit: 'Orbit', electric: 'Electric', glitch: 'Glitch', halo: 'Halo', rainbow: 'Rainbow'
 };
@@ -33,6 +46,7 @@ let messageCache = new Map();
 let replyTarget = null;
 let searchQuery = '';
 let loginMode = false;
+let verificationEmail = '';
 let profileUser = null;
 let toastTimer;
 let selectedAvatarFile = null;
@@ -58,6 +72,9 @@ let coinBalance = 0;
 let mentionQueryStart = null;
 let mentionedRoomId = null;
 let typingTimer = null;
+let unreadDmIds = new Set();
+let dmPeerIds = new Set();
+let friendData = { friends: [], incoming: [], outgoing: [] };
 const typingUsers = new Map();
 const voiceConnections = new Map();
 const voiceUsers = new Map();
@@ -75,7 +92,12 @@ async function api(url, options = {}) {
     headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers }
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error || 'Something went wrong.');
+  if (!response.ok) {
+    const error = new Error(result.error || 'Something went wrong.');
+    error.requiresEmailVerification = result.requiresEmailVerification === true;
+    error.email = result.email;
+    throw error;
+  }
   return result;
 }
 
@@ -146,6 +168,7 @@ function showAuth(screen) {
   $('#appShell').hidden = true;
   $('#welcomeScreen').hidden = screen !== 'welcome';
   $('#createScreen').hidden = screen !== 'create';
+  $('#verificationScreen').hidden = screen !== 'verification';
   refreshIcons();
 }
 
@@ -163,7 +186,7 @@ function setAuthMode(isLogin) {
   $('#emailInput').placeholder = isLogin ? 'Username or email' : 'you@example.com';
   $('#submitAccount').innerHTML = isLogin ? 'Sign in <i data-lucide="arrow-right"></i>' : 'Create account <i data-lucide="arrow-right"></i>';
   $('#formSwitch').innerHTML = isLogin
-    ? 'New to Chatroom? <button id="formLogin" class="text-button" type="button">Create an account</button>'
+    ? 'New to Obsidian Chat? <button id="formLogin" class="text-button" type="button">Create an account</button>'
     : 'Already have an account? <button id="formLogin" class="text-button" type="button">Sign in</button>';
   $('#formLogin').addEventListener('click', () => setAuthMode(!loginMode));
   $('#formError').textContent = '';
@@ -183,12 +206,28 @@ function renderPeople() {
   host.innerHTML = users.map((user) => `<li><button class="person-button${activeContext.type === 'dm' && activeContext.id === user.id ? ' active' : ''}" data-person="${escapeHTML(user.id)}">${avatarMarkup(user)}<span class="person-copy"><span class="person-name">${escapeHTML(user.name)}${badgeMarkup(user)}</span><span class="person-status ${onlineIds.includes(user.id) ? 'is-online' : ''}">${onlineIds.includes(user.id) ? 'Online' : 'Offline'}</span></span><span class="person-arrow">›</span></button></li>`).join('');
 }
 
+function renderDirectMessages() {
+  const host = $('#dmList');
+  if (!host) return;
+  const peers = users.filter((user) => user.id !== currentUser?.id && dmPeerIds.has(user.id));
+  host.innerHTML = peers.length
+    ? peers.map((peer) => `<li><button class="dm-button${activeContext.type === 'dm' && activeContext.id === peer.id ? ' active' : ''}" data-dm="${escapeHTML(peer.id)}">${avatarMarkup(peer)}<span class="dm-name">${escapeHTML(peer.name)}</span>${unreadDmIds.has(peer.id) ? '<span class="dm-unread-dot" aria-label="Unread message"></span>' : ''}</button></li>`).join('')
+    : '<li class="empty-person">No direct messages yet.</li>';
+  host.querySelectorAll('[data-dm]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const peer = profileById(button.dataset.dm);
+      if (peer) openDirect(peer);
+    });
+  });
+}
+
 function renderSidebar() {
   const textRooms = rooms.filter((room) => room.type !== 'voice');
   const voiceRooms = rooms.filter((room) => room.type === 'voice');
   $('#channelList').innerHTML = textRooms.map((room) => `<li><button class="channel-button${activeContext.type === 'room' && activeContext.id === room.id ? ' active' : ''}" data-channel="${escapeHTML(room.id)}"><span class="channel-hash">#</span><span class="channel-name">${escapeHTML(room.name)}</span></button></li>`).join('');
   $('#voiceList').innerHTML = voiceRooms.map((room) => `<li><button class="channel-button${activeContext.type === 'voice' && activeContext.id === room.id ? ' active' : ''}" data-voice-room="${escapeHTML(room.id)}"><span class="channel-hash"><i class="fa-solid fa-volume-high"></i></span><span class="channel-name">${escapeHTML(room.name)}</span></button></li>`).join('');
   renderPeople();
+  renderDirectMessages();
   document.querySelectorAll('[data-channel]').forEach((button) => button.addEventListener('click', () => openRoom(button.dataset.channel)));
   document.querySelectorAll('[data-voice-room]').forEach((button) => button.addEventListener('click', () => openVoiceRoom(button.dataset.voiceRoom)));
   document.querySelectorAll('[data-person]').forEach((button) => button.addEventListener('click', () => {
@@ -230,7 +269,7 @@ function messagesFor(context = activeContext) {
 
 function avatarMarkup(user, extraClass = '') {
   const photo = user.avatar ? `<img src="${escapeHTML(user.avatar)}" alt="">` : `<span class="avatar-initials">${escapeHTML(initials(user.name))}</span>`;
-  const decoration = user.avatarDecorationUrl ? `<img class="avatar-decoration-overlay" src="${escapeHTML(user.avatarDecorationUrl)}" alt="" loading="lazy">` : '';
+  const decoration = user.avatarDecorationUrl ? `<img class="avatar-decoration-overlay" src="${escapeHTML(user.avatarDecorationUrl)}" alt="" loading="eager" decoding="sync">` : '';
   return `<span class="person-avatar avatar-shell ${colorForUser(user.id)} ${extraClass}" data-effect="${escapeHTML(user.avatarEffect || 'none')}">${photo}${decoration}</span>`;
 }
 
@@ -259,8 +298,9 @@ function renderMessage(message, messages) {
   const reactions = message.reactions || {};
   const reactionMarkup = Object.entries(reactions).filter(([, ids]) => ids.length).map(([emoji, ids]) => `<button class="reaction${ids.includes(currentUser.id) ? ' selected' : ''}" data-react="${escapeHTML(emoji)}" data-message-id="${escapeHTML(message.id)}" aria-label="React ${escapeHTML(emoji)}">${escapeHTML(emoji)} ${ids.length}</button>`).join('');
   const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(message.createdAt));
-  return `<article class="message" data-message-id="${escapeHTML(message.id)}">
-    ${avatarMarkup(author)}
+  const decorationStyle = author.bannerDecorationUrl ? ` style="--message-decoration: url('${escapeHTML(author.bannerDecorationUrl)}')"` : '';
+  return `<article class="message${author.bannerDecorationUrl ? ' decorated-message' : ''}" data-message-id="${escapeHTML(message.id)}"${decorationStyle}>
+    <button class="message-avatar-button" data-user="${escapeHTML(author.id)}" aria-label="Open ${escapeHTML(author.name)} profile">${avatarMarkup(author)}</button>
     <div class="message-body">
       <div class="message-meta"><span class="message-author-group">${author.role === 'system' ? '<span class="message-author">BOT</span>' : `<button class="message-author" data-user="${escapeHTML(author.id)}">${escapeHTML(author.name)}</button>`}${badgeMarkup(author)}</span><span class="message-time">${escapeHTML(time)}</span></div>
       ${reply ? `<blockquote class="reply-quote"><strong>${escapeHTML(reply.user?.name || 'Member')}</strong> &nbsp;${escapeHTML(reply.text.slice(0, 150))}</blockquote>` : ''}
@@ -282,7 +322,7 @@ function renderMessages() {
   const filtered = messages.filter((message) => `${message.user?.name || ''} ${message.text}`.toLowerCase().includes(searchQuery.toLowerCase()));
   const container = $('#messages');
   container.innerHTML = `<div class="date-divider">${activeContext.type === 'room' ? 'ROOM CONVERSATION' : 'DIRECT MESSAGE'}</div>${filtered.length ? filtered.map((message) => renderMessage(message, messages)).join('') : `<p class="empty-state">${searchQuery ? 'No messages match that search.' : 'No messages yet. Start the conversation.'}</p>`}`;
-  requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
+  scrollMessagesToBottom(container);
   refreshIcons();
 }
 
@@ -292,6 +332,18 @@ function mergeMessages(history, liveMessages) {
     if (!messagesById.has(message.id)) messagesById.set(message.id, message);
   }
   return [...messagesById.values()].sort((first, second) => Date.parse(first.createdAt) - Date.parse(second.createdAt));
+}
+
+function scrollMessagesToBottom(container = $('#messages')) {
+  if (!container) return;
+  const scroll = () => {
+    container.scrollTop = container.scrollHeight;
+    try { container.scrollTo({ top: container.scrollHeight, behavior: 'auto' }); } catch {}
+  };
+  scroll();
+  requestAnimationFrame(scroll);
+  requestAnimationFrame(() => requestAnimationFrame(scroll));
+  setTimeout(scroll, 50);
 }
 
 function joinSocketRoom(eventName, roomId) {
@@ -317,12 +369,18 @@ function updateTypingStatus() {
     }
   }
   activeTypers = [...new Map(activeTypers.map((user) => [user.id, user])).values()];
+  const indicator = $('#typingIndicator');
   if (!activeTypers.length) {
+    if (indicator) indicator.hidden = true;
     setContextHeader();
     return;
   }
   const names = activeTypers.slice(0, 2).map((user) => user.name).join(' and ');
   $('#chatSubtitle').textContent = `${names} ${activeTypers.length === 1 ? 'is' : 'are'} typing...`;
+  if (indicator) {
+    indicator.hidden = false;
+    indicator.innerHTML = `<span>${escapeHTML(names)} ${activeTypers.length === 1 ? 'is' : 'are'} typing</span><span class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>`;
+  }
 }
 
 function renderOnline() {
@@ -400,6 +458,9 @@ async function openRoom(roomId) {
 async function openDirect(peer) {
   if (voiceRoomId) leaveVoiceRoom();
   activeContext = { type: 'dm', id: peer.id };
+  dmPeerIds.add(peer.id);
+  unreadDmIds.delete(peer.id);
+  renderDirectMessages();
   searchQuery = '';
   setReply(null);
   setContextHeader();
@@ -525,7 +586,31 @@ function openVoiceRoom(roomId) {
   renderVoiceMembers();
 }
 
-function openProfile(user) {
+async function refreshFriendState() {
+  try { friendData = await api('/api/friends'); } catch { friendData = { friends: [], incoming: [], outgoing: [] }; }
+}
+
+function updateProfileFriendActions(user) {
+  const friendRequestButton = $('#friendRequestButton');
+  const friendResponseActions = $('#friendResponseActions');
+  friendRequestButton.hidden = user.id === currentUser.id;
+  friendRequestButton.disabled = false;
+  friendResponseActions.hidden = true;
+  const isFriend = friendData.friends.some((friend) => friend.id === user.id);
+  const incoming = friendData.incoming.some((friend) => friend.id === user.id);
+  const outgoing = friendData.outgoing.some((friend) => friend.id === user.id);
+  if (isFriend) {
+    friendRequestButton.hidden = true;
+  } else if (incoming) {
+    friendRequestButton.hidden = true;
+    friendResponseActions.hidden = false;
+  } else {
+    friendRequestButton.textContent = outgoing ? 'Request Sent' : 'Add Friend';
+    friendRequestButton.disabled = outgoing;
+  }
+}
+
+async function openProfile(user) {
   profileUser = user;
   const banner = $('#modalBanner');
   if (user.banner) {
@@ -538,6 +623,7 @@ function openProfile(user) {
   $('#modalAvatar').innerHTML = avatarMarkup(user, 'profile-avatar-image');
   $('#modalName').textContent = user.name;
   $('#modalBadge').innerHTML = badgeMarkup(user);
+  $('#modalFriends').textContent = `${Number(user.friendCount || 0).toLocaleString()} friend${user.friendCount === 1 ? '' : 's'} · ${Number(user.warningCount || 0)} warning${user.warningCount === 1 ? '' : 's'}`;
   $('#modalBio').textContent = user.bio || 'This person hasn’t added a bio yet.';
   $('#modalError').textContent = '';
   $('#bioEditor').hidden = true;
@@ -553,6 +639,19 @@ function openProfile(user) {
   $('#promoteUserButton').textContent = user.role === 'moderator' ? 'Remove Mod' : 'Make Mod';
   $('#muteUserButton').hidden = !['owner', 'moderator'].includes(currentUser.role) || user.id === currentUser.id || user.role === 'owner' || (currentUser.role === 'moderator' && user.role === 'moderator');
   $('#saveBioButton').hidden = true;
+  await refreshFriendState();
+  try {
+    const userList = await api('/api/users');
+    const freshUser = user.id === currentUser?.id
+      ? currentUser
+      : userList.users.find((entry) => entry.id === user.id) || null;
+    if (freshUser) {
+      profileUser = freshUser;
+      user = freshUser;
+      $('#modalFriends').textContent = `${Number(freshUser.friendCount || 0).toLocaleString()} friend${freshUser.friendCount === 1 ? '' : 's'} · ${Number(freshUser.warningCount || 0)} warning${freshUser.warningCount === 1 ? '' : 's'}`;
+    }
+  } catch {}
+  updateProfileFriendActions(user);
   if (!$('#profileDialog').open) $('#profileDialog').showModal();
   refreshIcons();
 }
@@ -599,12 +698,17 @@ function openDecorationPurchase(effectId) {
   $('#decorationBuyPreview').src = decoration?.file ? `/${decoration.route || 'avatar-decorations'}/${encodeURIComponent(decoration.file)}` : '';
   $('#decorationBuyPreview').hidden = !decoration?.file;
   $('#decorationBuyRarity').textContent = decoration?.rarity ? `${decoration.rarity.toUpperCase()} DECORATION` : 'FREE DECORATION';
-  $('#decorationBuyTitle').textContent = decoration?.name || 'Remove decoration';
+  const itemName = decoration?.name || 'Remove decoration';
+  $('#decorationBuyTitle').textContent = itemName;
   $('#decorationBuyCoins').textContent = isOwner ? '∞ Owner coins' : `Your coins: ${coinBalance.toLocaleString()}`;
   $('#decorationBuyStatus').textContent = owned || isOwner || effectId === 'none'
     ? 'Ready to equip on your avatar.'
     : coinBalance >= decoration.price ? `You can buy this for ${decoration.price} coins.` : `You need ${decoration.price - coinBalance} more coins.`;
-  $('#decorationBuyConfirm').textContent = owned || isOwner || effectId === 'none' ? 'Equip' : coinBalance >= decoration.price ? `Buy · ${decoration.price}` : 'Need coins';
+  $('#decorationBuyConfirm').textContent = owned || isOwner || effectId === 'none'
+    ? `Use ${itemName}`
+    : coinBalance >= decoration.price
+      ? `Get ${itemName} · ${decoration.price}`
+      : `${itemName} · Need coins`;
   $('#decorationBuyConfirm').disabled = !owned && !isOwner && effectId !== 'none' && coinBalance < decoration.price;
   if (!$('#decorationBuyDialog').open) $('#decorationBuyDialog').showModal();
 }
@@ -612,7 +716,7 @@ function openDecorationPurchase(effectId) {
 async function confirmDecorationPurchase() {
   if (pendingPurchaseType === 'badge') {
     const badgeId = pendingDecorationId;
-    $('#decorationBuyDialog').close();
+    closeDecorationAction();
     try {
       const result = await api('/api/profile', { method: 'PATCH', body: JSON.stringify({ badge: badgeId }) });
       currentUser = result.user;
@@ -628,7 +732,7 @@ async function confirmDecorationPurchase() {
   if (!effectId) return;
   const owned = ownedEffects.includes(effectId);
   const isOwner = currentUser?.role === 'owner';
-  $('#decorationBuyDialog').close();
+  closeDecorationAction();
   if (effectId === 'none' || owned || isOwner) {
     await equipDecoration(effectId);
     return;
@@ -641,6 +745,62 @@ async function confirmDecorationPurchase() {
     await equipDecoration(effectId);
   } catch (error) { $('#customizerError').textContent = error.message; }
 }
+
+function closeDecorationAction() {
+  pendingDecorationId = null;
+  pendingPurchaseType = 'decoration';
+  const dialog = $('#decorationBuyDialog');
+  if (dialog?.open) dialog.close();
+}
+window.closeDecorationAction = closeDecorationAction;
+
+async function renderBannerDecorations() {
+  const grid = $('#bannerDecorationOptions');
+  if (!grid) return;
+  grid.innerHTML = '<p class="upload-hint">Loading banner decorations...</p>';
+  try {
+    const gifs = [];
+    let offset = 0;
+    let total = 0;
+    do {
+      const result = await api(`/api/gifs?limit=120&offset=${offset}`);
+      gifs.push(...result.gifs);
+      total = result.total;
+      offset += result.gifs.length;
+      if (result.gifs.length === 0) break;
+    } while (gifs.length < total);
+    const animated = await api('/api/banner-decorations');
+    const animatedMarkup = animated.decorations.map((decoration) => `<button class="banner-decoration-option" type="button" data-banner-decoration="${escapeHTML(decoration.id)}" data-banner-type="animated" title="Use ${escapeHTML(decoration.name)}"><img src="${escapeHTML(decoration.url)}" alt="${escapeHTML(decoration.name)}" loading="eager" decoding="sync"><span>${escapeHTML(decoration.name)}</span></button>`).join('');
+    grid.innerHTML = animatedMarkup + gifs.map((gif) => `<button class="banner-decoration-option" type="button" data-banner-decoration="${escapeHTML(gif.id)}" data-banner-type="gif" title="Use ${escapeHTML(gif.name)}"><img src="${escapeHTML(gif.url)}" alt="${escapeHTML(gif.name)}" loading="eager" decoding="sync"><span>${escapeHTML(gif.name)}</span></button>`).join('') || '<p class="upload-hint">No banner decorations available.</p>';
+    grid.querySelectorAll('[data-banner-decoration]').forEach((button) => button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        const result = button.dataset.bannerType === 'animated'
+          ? await api(`/api/banner/decoration/${encodeURIComponent(button.dataset.bannerDecoration)}`, { method: 'POST', body: '{}' })
+          : await api('/api/banner/gif', { method: 'POST', body: JSON.stringify({ gifId: button.dataset.bannerDecoration }) });
+        currentUser = result.user;
+        grid.querySelectorAll('[data-banner-decoration]').forEach((item) => item.classList.remove('active'));
+        button.classList.add('active');
+        renderOwnAvatar(currentUser);
+        renderSidebar();
+        showToast(`${button.title.replace(/^Use /, '')} banner decoration equipped.`);
+      } catch (error) { $('#customizerError').textContent = error.message; }
+      finally { button.disabled = false; }
+    }));
+  } catch (error) { grid.innerHTML = `<p class="upload-hint">${escapeHTML(error.message)}</p>`; }
+}
+
+document.querySelectorAll('[data-customization-category]').forEach((button) => button.addEventListener('click', () => {
+  const category = button.dataset.customizationCategory;
+  document.querySelectorAll('[data-customization-category]').forEach((tab) => {
+    const active = tab.dataset.customizationCategory === category;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  document.querySelectorAll('[data-customization-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.customizationPanel !== category;
+  });
+}));
 
 async function openAvatarStudio() {
   selectedAvatarEffect = currentUser.avatarEffect || 'none';
@@ -660,7 +820,7 @@ async function openAvatarStudio() {
   $('#effectOptions').innerHTML = decorationCatalog.map((decoration) => {
     const owned = ownedEffects.includes(decoration.id);
     const active = decoration.id === selectedAvatarEffect;
-    const framePreview = decoration.file ? `<img class="effect-frame-preview" src="/${decoration.route || 'avatar-decorations'}/${encodeURIComponent(decoration.file)}" alt="" loading="lazy" decoding="async">` : `<span class="effect-swatch ${decoration.id}"></span>`;
+    const framePreview = decoration.file ? `<img class="effect-frame-preview" src="/${decoration.route || 'avatar-decorations'}/${encodeURIComponent(decoration.file)}" alt="" loading="eager" decoding="sync">` : `<span class="effect-swatch ${decoration.id}"></span>`;
     return `<button class="effect-option${active ? ' active' : ''}" type="button" data-effect-choice="${decoration.id}" data-owned="${owned}">${framePreview}<span>${escapeHTML(decoration.name)}</span><small>${owned ? 'Owned' : `${decoration.price} · ${decoration.rarity}`}</small></button>`;
   }).join('');
   $('#badgeOptions').innerHTML = Object.entries(badgeLabels).map(([badge, label]) => `<button class="badge-option${badge === selectedBadge ? ' active' : ''}" type="button" data-badge-choice="${badge}">${badge === 'none' ? label : `<span class="profile-badge badge-${badge}">${label}</span>`}</button>`).join('');
@@ -672,12 +832,21 @@ async function openAvatarStudio() {
     $('#decorationBuyPreview').hidden = true;
     $('#decorationBuyRarity').textContent = 'PROFILE BADGE';
     $('#decorationBuyTitle').textContent = badgeLabels[badgeId] || 'Badge';
-    $('#decorationBuyCoins').textContent = currentUser?.role === 'owner' ? '∞ Owner coins' : 'Profile badge';
-    $('#decorationBuyStatus').textContent = 'Ready to equip on your name.';
-    $('#decorationBuyConfirm').textContent = 'Equip';
-    $('#decorationBuyConfirm').disabled = false;
+    const isAnimatedBadge = badgeId.startsWith('animated-');
+    const badgePrice = 1500 + (Number(badgeId.replace('animated-', '').replace(/^0+/, '') || '0') || 0) * 10;
+    const owned = badgeId === 'none' || currentUser?.ownedBadges?.includes(badgeId);
+    const canBuy = currentUser?.role === 'owner' || owned || (coinBalance >= badgePrice);
+    $('#decorationBuyCoins').textContent = currentUser?.role === 'owner' ? '∞ Owner coins' : `Your coins: ${Number(coinBalance || 0).toLocaleString()}`;
+    $('#decorationBuyStatus').textContent = !isAnimatedBadge || owned || currentUser?.role === 'owner'
+      ? 'Ready to equip on your name.'
+      : canBuy ? `This Halloween badge costs ${badgePrice} coins.` : `You need ${badgePrice - coinBalance} more coins.`;
+    $('#decorationBuyConfirm').textContent = !isAnimatedBadge || owned || currentUser?.role === 'owner'
+      ? 'Equip'
+      : `Get badge · ${badgePrice}`;
+    $('#decorationBuyConfirm').disabled = !canBuy;
     if (!$('#decorationBuyDialog').open) $('#decorationBuyDialog').showModal();
   }));
+  renderBannerDecorations();
   renderStudioPreview();
   refreshIcons();
 }
@@ -691,13 +860,31 @@ function animateChatView() {
 
 function closeProfileDialog() {
   const dialog = $('#profileDialog');
-  if (!dialog.open) return;
-  const animation = dialog.animate([{ opacity: 1, transform: 'translateY(0) scale(1)' }, { opacity: 0, transform: 'translateY(6px) scale(.99)' }], { duration: 150, easing: 'ease-in', fill: 'forwards' });
-  animation.onfinish = () => {
+  if (!dialog?.open) return;
+  try {
     dialog.close();
-    animation.cancel();
-  };
+  } catch {
+    dialog.removeAttribute('open');
+  }
 }
+
+window.chatroomProfileAction = function chatroomProfileAction(action, event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  if (action === 'close') {
+    closeProfileDialog();
+  } else if (action === 'edit-bio' && currentUser) {
+    startBioEditor();
+  } else if (action === 'avatar-shop' && currentUser) {
+    openAvatarStudio().catch((error) => {
+      $('#customizerError').textContent = error.message;
+      showToast(error.message);
+    });
+  }
+  return false;
+};
 
 function openSocket() {
   socket = io({ reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 500, reconnectionDelayMax: 5000 });
@@ -713,7 +900,7 @@ function openSocket() {
     users.push(user);
     renderSidebar();
     renderOnline();
-    showToast(`${user.name} joined Chatroom`);
+    showToast(`${user.name} joined Obsidian Chat`);
   });
   socket.on('typing:update', ({ type, id, user, typing }) => {
     const key = `${type}:${id}:${user.id}`;
@@ -730,19 +917,45 @@ function openSocket() {
   });
   socket.on('dm:message', (message) => {
     const peerId = message.user.id === currentUser.id ? message.recipientId : message.user.id;
+    dmPeerIds.add(peerId);
     const key = `dm:${peerId}`;
     const list = messageCache.get(key) || [];
     if (!list.some((item) => item.id === message.id)) list.push(message);
     messageCache.set(key, list);
-    if (activeContext.type === 'dm' && activeContext.id === peerId) renderMessages();
+    if (activeContext.type === 'dm' && activeContext.id === peerId) {
+      unreadDmIds.delete(peerId);
+      renderMessages();
+    } else if (message.user.id !== currentUser.id) {
+      unreadDmIds.add(peerId);
+    }
+    renderSidebar();
   });
   socket.on('dm:notification', ({ user, message }) => {
     const peerId = user.id;
+    dmPeerIds.add(peerId);
     const key = `dm:${peerId}`;
     const list = messageCache.get(key) || [];
     if (!list.some((item) => item.id === message.id)) list.push(message);
     messageCache.set(key, list);
-    if (!(activeContext.type === 'dm' && activeContext.id === peerId)) showToast(`New message from ${user.name}`);
+    if (!(activeContext.type === 'dm' && activeContext.id === peerId)) {
+      unreadDmIds.add(peerId);
+      showToast(`New message from ${user.name}`);
+      renderSidebar();
+    }
+  });
+  socket.on('friend:request', ({ user }) => {
+    refreshFriendState().then(() => {
+      if (profileUser?.id === user.id) updateProfileFriendActions(profileUser);
+    });
+    showToast(`${user.name} sent you a friend request`);
+  });
+  socket.on('friend:accepted', ({ user }) => {
+    refreshFriendState();
+    showToast(`${user.name} accepted your friend request`);
+  });
+  socket.on('friend:declined', ({ user }) => {
+    refreshFriendState();
+    showToast(`${user.name} declined your friend request`);
   });
   socket.on('mention:notification', ({ roomId, roomName, sender }) => {
     mentionedRoomId = roomId;
@@ -774,6 +987,7 @@ function openSocket() {
       if (user.banner) { banner.hidden = false; banner.innerHTML = `<img src="${escapeHTML(user.banner)}" alt="Profile banner" decoding="async">`; } else { banner.hidden = true; banner.innerHTML = ''; }
       $('#modalName').textContent = user.name;
       $('#modalBadge').innerHTML = badgeMarkup(user);
+      $('#modalFriends').textContent = `${Number(user.friendCount || 0).toLocaleString()} friend${user.friendCount === 1 ? '' : 's'} · ${Number(user.warningCount || 0)} warning${user.warningCount === 1 ? '' : 's'}`;
       $('#modalBio').textContent = user.bio || 'This person hasn’t added a bio yet.';
       if (!$('#customizerView').hidden) renderStudioPreview();
     }
@@ -782,6 +996,9 @@ function openSocket() {
     renderMessages();
   });
   socket.on('moderation:mute', ({ mutedUntil, reason }) => showMuteScreen(mutedUntil, reason));
+  socket.on('moderation:warning', ({ warningCount, warningLimit, mutedUntil }) => {
+    showToast(mutedUntil ? `BOT: Warning ${warningCount}/${warningLimit}. You were automatically muted for 10 minutes.` : `BOT: Warning ${warningCount}/${warningLimit}.`);
+  });
   socket.on('voice:ring', ({ roomId, roomName, participants = [] }) => {
     voiceRingRoomId = roomId;
     voiceUsers = new Map(participants.map((participant) => [participant.socketId, participant.user]));
@@ -821,16 +1038,19 @@ function openSocket() {
 
 async function enterChat(user, muteExpired = false) {
   currentUser = user;
+  dmPeerIds = new Set();
+  await refreshFriendState();
   $('#profileName').textContent = user.name;
   renderOwnAvatar(user);
   $('#authShell').hidden = true;
   $('#appShell').hidden = false;
   messageCache = new Map();
   try {
-    const [roomResult, userResult] = await Promise.all([api('/api/rooms'), api('/api/users')]);
+    const [roomResult, userResult, dmResult] = await Promise.all([api('/api/rooms'), api('/api/users'), api('/api/dms')]);
     rooms = roomResult.rooms;
     users = userResult.users;
     onlineIds = userResult.online;
+    dmPeerIds = new Set((dmResult.conversations || []).map((entry) => entry.peer.id));
     renderSidebar();
     renderOnline();
     openSocket();
@@ -900,11 +1120,61 @@ $('#accountForm').addEventListener('submit', async (event) => {
   try {
     $('#submitAccount').disabled = true;
     const result = await api(loginMode ? '/api/login' : '/api/signup', { method: 'POST', body: JSON.stringify(body) });
+    if (result.requiresEmailVerification) {
+      verificationEmail = result.email || body.email || '';
+      $('#verificationCopy').textContent = `Enter the 6-digit code sent to ${verificationEmail}.`;
+      if (result.verificationCode) $('#verificationCodeInput').value = result.verificationCode;
+      showAuth('verification');
+      return;
+    }
     await enterChat(result.user, result.muteExpired);
   } catch (error) {
     $('#formError').textContent = error.message;
+    if (error.requiresEmailVerification) {
+      verificationEmail = error.email || $('#emailInput').value.trim();
+      $('#verificationCopy').textContent = `Enter the 6-digit code sent to ${verificationEmail}.`;
+      showAuth('verification');
+    }
   } finally {
     $('#submitAccount').disabled = false;
+  }
+});
+
+$('#verificationBack').addEventListener('click', () => {
+  $('#verificationCodeInput').value = '';
+  setAuthMode(true);
+  showAuth('create');
+});
+
+$('#verificationForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    $('#verifyEmailButton').disabled = true;
+    const result = await api('/api/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ email: verificationEmail, code: $('#verificationCodeInput').value.trim() })
+    });
+    await enterChat(result.user, false);
+  } catch (error) {
+    $('#verificationError').textContent = error.message;
+  } finally {
+    $('#verifyEmailButton').disabled = false;
+  }
+});
+
+$('#resendVerification').addEventListener('click', async () => {
+  try {
+    $('#resendVerification').disabled = true;
+    const result = await api('/api/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email: verificationEmail })
+    });
+    $('#verificationError').textContent = 'A new verification code was sent.';
+    if (result.verificationCode) $('#verificationCodeInput').value = result.verificationCode;
+  } catch (error) {
+    $('#verificationError').textContent = error.message;
+  } finally {
+    $('#resendVerification').disabled = false;
   }
 });
 
@@ -1094,8 +1364,17 @@ $('#imageInput').addEventListener('change', () => {
   selectedChatImage = file;
   showToast(`Selected ${file.name}. It will be scanned before posting.`);
 });
-$('#menuButton').addEventListener('click', () => $('#sidebar').classList.add('open'));
-$('#closeSidebar').addEventListener('click', () => $('#sidebar').classList.remove('open'));
+$('#menuButton').addEventListener('click', () => {
+  if (window.innerWidth <= 760) {
+    $('#sidebar').classList.toggle('open');
+  } else {
+    $('#appShell').classList.toggle('sidebar-hidden');
+  }
+});
+$('#closeSidebar').addEventListener('click', () => {
+  if (window.innerWidth <= 760) $('#sidebar').classList.remove('open');
+  else $('#appShell').classList.add('sidebar-hidden');
+});
 $('#signOutButton').addEventListener('click', () => leaveChat());
 $('#ownProfileButton').addEventListener('click', () => openProfile(currentUser));
 $('#serverHomeButton').addEventListener('click', () => openRoom('general'));
@@ -1109,15 +1388,58 @@ $('#serverPeopleButton').addEventListener('click', () => {
 });
 $('#serverProfileButton').addEventListener('click', () => openProfile(currentUser));
 $('#closeProfile').addEventListener('click', closeProfileDialog);
-$('#closeDecorationBuy').addEventListener('click', () => $('#decorationBuyDialog').close());
-$('#decorationBuyCancel').addEventListener('click', () => $('#decorationBuyDialog').close());
-$('#decorationBuyConfirm').addEventListener('click', confirmDecorationPurchase);
+$('#editBioButton').addEventListener('click', () => {
+  if (currentUser) startBioEditor();
+});
+$('#customizeAvatarButton').addEventListener('click', () => {
+  if (!currentUser) return;
+  openAvatarStudio().catch((error) => {
+    $('#customizerError').textContent = error.message;
+    showToast(error.message);
+  });
+});
+$('#closeDecorationBuy').addEventListener('click', closeDecorationAction);
+$('#decorationBuyCancel').addEventListener('click', closeDecorationAction);
+$('#decorationBuyConfirm').addEventListener('click', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  confirmDecorationPurchase();
+});
 $('#decorationBuyDialog').addEventListener('click', (event) => { if (event.target === $('#decorationBuyDialog')) $('#decorationBuyDialog').close(); });
 $('#messageUserButton').addEventListener('click', () => {
   if (!profileUser || profileUser.id === currentUser.id) return;
   const peer = profileUser;
   closeProfileDialog();
   openDirect(peer);
+});
+$('#friendRequestButton').addEventListener('click', async () => {
+  if (!profileUser || profileUser.id === currentUser.id || $('#friendRequestButton').disabled) return;
+  try {
+    await api(`/api/friends/${encodeURIComponent(profileUser.id)}/request`, { method: 'POST', body: '{}' });
+    await refreshFriendState();
+    updateProfileFriendActions(profileUser);
+    showToast(`Friend request sent to ${profileUser.name}`);
+  } catch (error) { $('#modalError').textContent = error.message; }
+});
+$('#acceptFriendButton').addEventListener('click', async () => {
+  if (!profileUser) return;
+  try {
+    await api(`/api/friends/${encodeURIComponent(profileUser.id)}/accept`, { method: 'POST', body: '{}' });
+    await refreshFriendState();
+    updateProfileFriendActions(profileUser);
+    profileUser.friendCount = (profileUser.friendCount || 0) + 1;
+    $('#modalFriends').textContent = `${profileUser.friendCount} friends · ${Number(profileUser.warningCount || 0)} warnings`;
+    showToast(`You are now friends with ${profileUser.name}`);
+  } catch (error) { $('#modalError').textContent = error.message; }
+});
+$('#declineFriendButton').addEventListener('click', async () => {
+  if (!profileUser) return;
+  try {
+    await api(`/api/friends/${encodeURIComponent(profileUser.id)}/decline`, { method: 'POST', body: '{}' });
+    await refreshFriendState();
+    updateProfileFriendActions(profileUser);
+    showToast('Friend request declined');
+  } catch (error) { $('#modalError').textContent = error.message; }
 });
 $('#promoteUserButton').addEventListener('click', async () => {
   if (!profileUser) return;
@@ -1178,7 +1500,6 @@ $('#mentionNoticeDismiss').addEventListener('click', () => {
   mentionedRoomId = null;
   $('#mentionNotice').hidden = true;
 });
-$('#customizeAvatarButton').addEventListener('click', openAvatarStudio);
 $('#backToProfile').addEventListener('click', () => {
   $('#customizerView').hidden = true;
   $('#profileView').hidden = false;
@@ -1238,7 +1559,7 @@ $('#saveAvatarButton').addEventListener('click', async () => {
     button.disabled = false;
   }
 });
-$('#editBioButton').addEventListener('click', () => {
+function startBioEditor() {
   $('#bioEditor').value = currentUser.bio || '';
   $('#bioEditor').hidden = false;
   $('#bannerEditor').hidden = false;
@@ -1247,8 +1568,60 @@ $('#editBioButton').addEventListener('click', () => {
   $('#customizeAvatarButton').hidden = true;
   $('#messageUserButton').hidden = true;
   $('#saveBioButton').hidden = false;
+  $('#bioEditor').focus();
+}
+async function browseBannerAnimations() {
+  const grid = $('#bannerAnimationGrid');
+  grid.hidden = !grid.hidden;
+  if (!grid.hidden && !grid.children.length) {
+    try {
+      let gifs = [];
+      let offset = 0;
+      let total = 0;
+      do {
+        const result = await api(`/api/gifs?limit=120&offset=${offset}`);
+        gifs.push(...result.gifs);
+        total = result.total;
+        offset += result.gifs.length;
+      } while (gifs.length < total && offset > 0 && gifs.length % 120 === 0);
+      if (!gifs.length) {
+        grid.innerHTML = '<p class="upload-hint">No banner animations available.</p>';
+        return;
+      }
+      grid.innerHTML = gifs.map((gif) => `<button class="banner-animation-option" type="button" data-banner-gif="${escapeHTML(gif.id)}" title="Use ${escapeHTML(gif.name)}"><img src="${escapeHTML(gif.url)}" alt="${escapeHTML(gif.name)}" loading="eager" decoding="sync"><span>${escapeHTML(gif.name)}</span></button>`).join('');
+      grid.querySelectorAll('[data-banner-gif]').forEach((button) => button.addEventListener('click', async () => {
+        try {
+          const upload = await api('/api/banner/gif', { method: 'POST', body: JSON.stringify({ gifId: button.dataset.bannerGif }) });
+          currentUser = upload.user;
+          $('#modalBanner').hidden = false;
+          $('#modalBanner').innerHTML = `<img src="${escapeHTML(currentUser.banner)}" alt="Profile banner">`;
+          selectedBannerFile = null;
+          grid.hidden = true;
+          showToast('Banner animation saved.');
+        } catch (error) { $('#modalError').textContent = error.message; }
+      }));
+    } catch (error) { $('#modalError').textContent = error.message; }
+  }
+}
+
+window.chatroomBannerAction = function chatroomBannerAction(action, event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  if (action === 'choose-file') {
+    $('#bannerFile')?.click();
+  } else if (action === 'browse-animations') {
+    browseBannerAnimations().catch((error) => { if ($('#modalError')) $('#modalError').textContent = error.message; });
+  }
+  return false;
+};
+$('#chooseBannerButton').addEventListener('click', (event) => {
+  window.chatroomBannerAction('choose-file', event);
 });
-$('#chooseBannerButton').addEventListener('click', () => $('#bannerFile').click());
+$('#browseBannerAnimations').addEventListener('click', (event) => {
+  window.chatroomBannerAction('browse-animations', event);
+});
 $('#bannerFile').addEventListener('change', () => {
   const file = $('#bannerFile').files?.[0];
   if (!file) return;
@@ -1300,11 +1673,27 @@ $('#linkWarningDialog').addEventListener('click', (event) => {
   }
 });
 
-document.addEventListener('click', (event) => {
-  const button = event.target.closest('button');
-  if (!button || button.disabled || typeof button.animate !== 'function') return;
-  button.animate([{ opacity: 0.72, transform: 'scale(.97)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 180, easing: 'ease-out' });
-});
+const messagesObserver = new MutationObserver(() => scrollMessagesToBottom());
+const messagesNode = $('#messages');
+if (messagesNode) {
+  messagesObserver.observe(messagesNode, { childList: true, subtree: true });
+  messagesNode.addEventListener('load', (event) => {
+    if (event.target instanceof HTMLImageElement || event.target instanceof HTMLVideoElement) scrollMessagesToBottom(messagesNode);
+  }, true);
+  if ('ResizeObserver' in window) new ResizeObserver(() => scrollMessagesToBottom(messagesNode)).observe(messagesNode);
+}
+
+async function preloadAvatarDecorations() {
+  try {
+    const shop = await api('/api/avatar-decorations');
+    shop.decorations.forEach((decoration) => {
+      if (!decoration.file) return;
+      const image = new Image();
+      image.decoding = 'sync';
+      image.src = `/${decoration.route || 'avatar-decorations'}/${encodeURIComponent(decoration.file)}`;
+    });
+  } catch {}
+}
 
 (async function boot() {
   try {
@@ -1312,5 +1701,6 @@ document.addEventListener('click', (event) => {
     if (result.user) await enterChat(result.user, result.muteExpired);
     else showAuth('welcome');
   } catch { showAuth('welcome'); }
+  preloadAvatarDecorations();
   refreshIcons();
 })();

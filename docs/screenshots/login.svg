@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <rect width="1200" height="720" fill="#f6f7f2"/>
+  <rect width="610" height="720" fill="#fafbf7"/>
+  <rect x="610" width="590" height="720" fill="#e9f1dc"/>
+  <rect x="65" y="55" width="190" height="42" rx="21" fill="#d7f474"/>
+  <circle cx="88" cy="76" r="11" fill="#1d2722"/>
+  <text x="109" y="82" fill="#1d2722" font-family="Arial,sans-serif" font-size="23" font-weight="700">Chatroom</text>
+  <text x="110" y="245" fill="#536050" font-family="Arial,sans-serif" font-size="14" font-weight="700">WELCOME BACK</text>
+  <text x="110" y="310" fill="#1d2722" font-family="Arial,sans-serif" font-size="54" font-weight="700">Welcome back.</text>
+  <text x="110" y="350" fill="#69736d" font-family="Arial,sans-serif" font-size="18">Sign in and pick up the conversation.</text>
+  <rect x="110" y="390" width="390" height="52" rx="8" fill="#fff" stroke="#dfe4dc"/>
+  <text x="128" y="422" fill="#8f9891" font-family="Arial,sans-serif" font-size="15">Email address or username</text>
+  <rect x="110" y="458" width="390" height="52" rx="8" fill="#fff" stroke="#dfe4dc"/>
+  <text x="128" y="490" fill="#8f9891" font-family="Arial,sans-serif" font-size="15">Password</text>
+  <rect x="110" y="532" width="390" height="54" rx="8" fill="#1d2722"/>
+  <text x="305" y="565" fill="#fff" font-family="Arial,sans-serif" font-size="17" font-weight="700" text-anchor="middle">Sign in</text>
+  <rect x="700" y="150" width="420" height="410" rx="16" fill="#fff" stroke="#dce5d2"/>
+  <rect x="700" y="150" width="420" height="54" rx="16" fill="#10130f"/>
+  <circle cx="730" cy="177" r="12" fill="#d8ff64"/>
+  <text x="752" y="183" fill="#f4f7f2" font-family="Arial,sans-serif" font-size="16" font-weight="700"># general</text>
+  <circle cx="1090" cy="177" r="7" fill="#43b581"/>
+  <rect x="720" y="224" width="380" height="250" rx="10" fill="#f8faf6"/>
+  <circle cx="760" cy="268" r="22" fill="#aacafa"/>
+  <text x="752" y="274" fill="#1d2722" font-family="Arial,sans-serif" font-size="16" font-weight="700">A</text>
+  <text x="795" y="258" fill="#1d2722" font-family="Arial,sans-serif" font-size="16" font-weight="700">Alex Morgan</text>
+  <text x="795" y="282" fill="#69736d" font-family="Arial,sans-serif" font-size="14">Welcome to Chatroom!</text>
+  <circle cx="760" cy="330" r="22" fill="#d9cdfc"/>
+  <text x="752" y="336" fill="#1d2722" font-family="Arial,sans-serif" font-size="16" font-weight="700">J</text>
+  <text x="795" y="320" fill="#1d2722" font-family="Arial,sans-serif" font-size="16" font-weight="700">Jamie Lee</text>
+  <text x="795" y="344" fill="#69736d" font-family="Arial,sans-serif" font-size="14">Good to see everyone here.</text>
+  <rect x="720" y="498" width="380" height="42" rx="8" fill="#fff" stroke="#e8ebe4"/>
+  <text x="738" y="524" fill="#9aa39c" font-family="Arial,sans-serif" font-size="14">Message #general</text>
+</svg>

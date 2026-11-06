@@ -14,6 +14,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = Number(process.env.PORT) || 4173;
 const dataPath = process.env.CHATROOM_DATA_PATH || path.join(__dirname, 'data', 'chatroom.json');
+const bannerDecorations = {};
 const avatarEffects = new Set(['none', 'glow', 'aurora', 'frost', 'sparkle', 'sunset', 'neon', 'rose', 'ocean', 'ember', 'cosmic', 'hologram', 'midnight', 'gold', 'prism', 'pulse', 'orbit', 'electric', 'glitch', 'halo', 'rainbow']);
 const avatarDecorations = {
   none: { price: 0, rarity: 'Free' }, glow: { price: 100, rarity: 'Common' }, frost: { price: 150, rarity: 'Common' },
@@ -29,6 +30,7 @@ const profileBadges = new Set([
   'artist', 'creator', 'gamer', 'music', 'bookworm', 'night-owl', 'helper', 'trailblazer', 'dreamer', 'explorer', 'legend', 'stargazer', 'good-vibes', 'plant-parent', 'pixel-pro', 'cozy-core', 'comet', 'moonbeam', 'sunshine', 'vivid', 'tiny-chaos', 'team-player', 'maker', 'storyteller', 'early-bird',
   'dragon', 'angel', 'raver', 'builder', 'rocket', 'spectral', 'spark', 'flower', 'wizard', 'sun-chaser'
 ]);
+for (let badgeNumber = 1; badgeNumber <= 300; badgeNumber++) profileBadges.add(`animated-${String(badgeNumber).padStart(3, '0')}`);
 const sessionMiddleware = session({
   name: 'chatroom.sid',
   secret: process.env.SESSION_SECRET || 'local-chatroom-change-this-secret',
@@ -51,7 +53,6 @@ function defaultRooms() {
   const createdAt = new Date().toISOString();
   return [
     { id: 'general', name: 'general', type: 'text', createdAt },
-    { id: 'kirkwood-schools', name: 'kirkwood schools', type: 'text', createdAt },
     { id: 'links', name: 'links', type: 'text', createdAt },
     { id: 'voice', name: 'Voice Room', type: 'voice', createdAt }
   ];
@@ -69,10 +70,26 @@ async function loadDatabase() {
   for (const user of database.users) {
     if (!Number.isInteger(user.coins) || user.coins < 0) user.coins = 0;
     if (!Array.isArray(user.ownedEffects)) user.ownedEffects = ['none'];
+    if (!Array.isArray(user.ownedBadges)) user.ownedBadges = ['none'];
+    if (!Array.isArray(user.warnings)) user.warnings = [];
+    if (typeof user.emailVerified !== 'boolean') user.emailVerified = true;
+    if (!Array.isArray(user.friends)) { user.friends = []; changed = true; }
+    if (!Array.isArray(user.friendRequestsIn)) { user.friendRequestsIn = []; changed = true; }
+    if (!Array.isArray(user.friendRequestsOut)) { user.friendRequestsOut = []; changed = true; }
   }
   for (const user of database.users) if (!user.banner) user.banner = null;
   if (!Array.isArray(database.attachments)) {
     database.attachments = [];
+    changed = true;
+  }
+  const filteredRooms = database.rooms.filter((room) => room.id !== 'kirkwood-schools' && room.name?.trim().toLowerCase() !== 'kirkwood schools');
+  if (filteredRooms.length !== database.rooms.length) {
+    database.rooms = filteredRooms;
+    changed = true;
+  }
+  const filteredMessages = database.messages.filter((message) => message.roomId !== 'kirkwood-schools');
+  if (filteredMessages.length !== database.messages.length) {
+    database.messages = filteredMessages;
     changed = true;
   }
   for (const room of defaultRooms()) {
@@ -110,17 +127,37 @@ async function loadAvatarDecorations() {
   let index = 0;
   for (const source of directories) {
     const entries = await fs.readdir(source.directory, { withFileTypes: true }).catch((error) => { if (error.code === 'ENOENT') return []; throw error; });
-    const files = entries.filter((entry) => entry.isFile() && /\.png$/i.test(entry.name)).sort((first, second) => first.name.localeCompare(second.name));
+    const files = entries.filter((entry) => entry.isFile() && /\.(png|gif|webp|svg)$/i.test(entry.name)).sort((first, second) => first.name.localeCompare(second.name));
     for (const entry of files) {
-      const baseName = entry.name.replace(/\.png$/i, '').replace(/^\d+[-_]/, '').replace(/^\d+_/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()).replace(/\.(?=\w)/g, '');
+      const relativeFile = source.directory.endsWith('github-animated') ? `github-animated/${entry.name}` : entry.name;
+      const baseName = entry.name.replace(/\.(png|gif|webp|svg)$/i, '').replace(/^github-[-\s]*/, '').replace(/^\d+[-_]/, '').replace(/^\d+_/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()).replace(/\.(?=\w)/g, '');
       const cleanSlug = baseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `decoration-${index + 1}`;
+      const name = source.directory.endsWith('github-animated')
+        ? baseName.replace(/^(Animated\s+)?Collection\s*/i, '').trim() || `Animated ${entry.name.match(/\d+/)?.[0] || index + 1}`
+        : baseName;
       const slug = `${source.prefix}${cleanSlug}`;
       const tier = index < 56 ? 'Common' : index < 112 ? 'Uncommon' : index < 168 ? 'Rare' : index < 224 ? 'Epic' : 'Legendary';
       const price = Math.min(1000, 100 + Math.floor(index / 28) * 100);
-      avatarDecorations[slug] = { price, rarity: tier, file: entry.name, route: source.route, name: baseName };
+      avatarDecorations[slug] = { price, rarity: tier, file: relativeFile, route: source.route, name: name || `Obsidian Deco ${index + 1}` };
       avatarEffects.add(slug);
       index++;
     }
+  }
+}
+
+async function loadBannerDecorations() {
+  const directory = path.join(__dirname, 'public', 'avatar-decorations', 'github-animated');
+  const entries = await fs.readdir(directory, { withFileTypes: true }).catch((error) => { if (error.code === 'ENOENT') return []; throw error; });
+  for (const entry of entries.filter((item) => item.isFile() && /^github-animated-\d+\.(gif)$/i.test(item.name)).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))) {
+    const match = entry.name.match(/(\d+)/);
+    const number = match ? Number(match[1]) : 0;
+    const id = `animated-${String(number).padStart(3, '0')}`;
+    bannerDecorations[id] = {
+      id,
+      name: `Animated ${number}`,
+      file: `github-animated/${entry.name}`,
+      url: `/avatar-decorations/github-animated/${encodeURIComponent(entry.name)}`
+    };
   }
 }
 
@@ -168,13 +205,20 @@ function publicUser(user) {
     avatarEffect: user.avatarEffect || 'none',
     avatarDecorationUrl: avatarDecorations[user.avatarEffect]?.file ? `/${avatarDecorations[user.avatarEffect].route || 'avatar-decorations'}/${encodeURIComponent(avatarDecorations[user.avatarEffect].file)}` : null,
     banner: user.banner ? `/banners/${encodeURIComponent(user.banner)}` : null,
+    bannerDecorationUrl: user.bannerDecorationId && bannerDecorations[user.bannerDecorationId]
+      ? bannerDecorations[user.bannerDecorationId].url
+      : user.banner ? `/banners/${encodeURIComponent(user.banner)}` : null,
+    emailVerified: user.emailVerified !== false,
     badge: user.badge || 'none',
     role: user.role || 'member',
+    friendCount: Array.isArray(user.friends) ? user.friends.length : 0,
     coins: user.role === 'owner' ? null : (Number.isInteger(user.coins) ? user.coins : 0),
     infiniteCoins: user.role === 'owner',
     ownedEffects: Array.isArray(user.ownedEffects) ? ['none', ...new Set(user.ownedEffects.filter((effect) => avatarEffects.has(effect)))] : ['none'],
+    ownedBadges: Array.isArray(user.ownedBadges) ? user.ownedBadges : ['none'],
     mutedUntil: user.mutedUntil || null,
     muteReason: user.muteReason || '',
+    warningCount: Array.isArray(user.warnings) ? user.warnings.length : 0,
     createdAt: user.createdAt
   };
 }
@@ -206,6 +250,31 @@ function isValidText(value, maxLength) {
 
 function hasBlockedLanguage(value) {
   return leoProfanity.check(value.normalize('NFKC').replace(/[\u200b-\u200f\uFEFF]/g, ''));
+}
+
+async function issueWarning(author, roomId = 'general', source = 'Blocked keyword or rule match') {
+  if (!author) return null;
+  author.warnings ||= [];
+  const warning = { id: crypto.randomUUID(), source, createdAt: new Date().toISOString() };
+  author.warnings.push(warning);
+  const warningCount = author.warnings.length;
+  let autoMutedUntil = null;
+  if (warningCount >= 3 && !isRoomModerator(author)) {
+    autoMutedUntil = new Date(Date.now() + 10 * 60000).toISOString();
+    author.mutedUntil = autoMutedUntil;
+    author.muteReason = 'Automatic warning escalation';
+  }
+  const room = database.rooms.find((entry) => entry.id === roomId && entry.type !== 'voice') || database.rooms.find((entry) => entry.id === 'general');
+  const text = autoMutedUntil
+    ? `BOT WARNING: ${author.name} received warning ${warningCount}/3 and was automatically muted for 10 minutes.`
+    : `BOT WARNING: ${author.name} received warning ${warningCount}/3. Please keep chat respectful.`;
+  const botMessage = { id: crypto.randomUUID(), type: 'room', roomId: room.id, userId: 'system-bot', text, replyTo: null, reactions: {}, createdAt: new Date().toISOString() };
+  database.messages.push(botMessage);
+  await persistDatabase();
+  io.emit('profile:update', publicUser(author));
+  io.to(`room:${room.id}`).emit('room:message', roomMessage(botMessage));
+  io.to(`user:${author.id}`).emit('moderation:warning', { warningCount, warningLimit: 3, mutedUntil: autoMutedUntil });
+  return { warningCount, autoMutedUntil, roomId: room.id };
 }
 
 function isRoomModerator(user) {
@@ -302,7 +371,7 @@ function trustedGateway(request) {
 }
 
 function enforceTrustedGateway(request, response, next) {
-  if (!trustedGateway(request)) return response.status(process.env.CHATROOM_GATEWAY_TOKEN ? 403 : 503).send('Chatroom is only available through the approved school network.');
+  if (!trustedGateway(request)) return response.status(process.env.CHATROOM_GATEWAY_TOKEN ? 403 : 503).send('Obsidian Chat is only available through the approved school network.');
   next();
 }
 
@@ -323,6 +392,37 @@ app.use(sessionMiddleware);
 
 app.get('/', (request, response) => response.sendFile(path.join(__dirname, 'index.html')));
 app.get('/app.js', (request, response) => response.type('application/javascript').sendFile(path.join(__dirname, 'app.js')));
+app.get('/api/banner-decorations', requireUser, (request, response) => {
+  response.setHeader('Cache-Control', 'private, max-age=300');
+  response.json({ decorations: Object.values(bannerDecorations) });
+});
+
+app.post('/api/banner/decoration/:decorationId', requireUser, async (request, response, next) => {
+  try {
+    const decoration = bannerDecorations[request.params.decorationId];
+    if (!decoration) return response.status(404).json({ error: 'Banner decoration not found.' });
+    const source = path.join(__dirname, 'public', 'avatar-decorations', 'github-animated', path.basename(decoration.file.split('/').pop()));
+    const image = await fs.readFile(source);
+    if (!image.subarray(0, 6).toString('ascii').match(/^GIF8[79]a$/)) return response.status(422).json({ error: 'This decoration is not a valid GIF.' });
+    const directory = path.join(path.dirname(dataPath), 'banners');
+    await fs.mkdir(directory, { recursive: true });
+    const filename = `${crypto.randomUUID()}.gif`;
+    await fs.writeFile(path.join(directory, filename), image, { flag: 'wx', mode: 0o600 });
+    const previousBanner = request.user.banner;
+    request.user.banner = filename;
+    request.user.bannerDecorationId = `gif:${request.body.gifId}`;
+    request.user.bannerDecorationId = request.params.decorationId;
+    try { await persistDatabase(); } catch (error) {
+      request.user.banner = previousBanner;
+      await fs.unlink(path.join(directory, filename)).catch(() => {});
+      throw error;
+    }
+    if (previousBanner) await fs.unlink(path.join(directory, previousBanner)).catch(() => {});
+    io.emit('profile:update', publicUser(request.user));
+    response.json({ user: publicUser(request.user) });
+  } catch (error) { next(error); }
+});
+
 app.get('/api/gifs', requireUser, (request, response) => {
   const query = String(request.query.q || '').trim().toLowerCase();
   const offset = Math.max(0, Number.parseInt(request.query.offset, 10) || 0);
@@ -383,12 +483,63 @@ app.post('/api/signup', async (request, response, next) => {
     const passwordHash = (await scrypt(password, salt, 64)).toString('hex');
     const configuredOwner = process.env.CHATROOM_OWNER_EMAIL?.trim().toLowerCase();
     const isOwner = configuredOwner ? configuredOwner === email : name.toLowerCase() === 'joshua boudreau';
-    const user = { id: crypto.randomUUID(), name, email, bio, salt, passwordHash, role: isOwner ? 'owner' : 'member', coins: 0, ownedEffects: ['none'], createdAt: new Date().toISOString() };
+    const verificationCode = String(crypto.randomInt(100000, 1000000));
+    const verificationHash = crypto.createHash('sha256').update(`${email}:${verificationCode}`).digest('hex');
+    const user = {
+      id: crypto.randomUUID(), name, email, bio, salt, passwordHash, role: isOwner ? 'owner' : 'member',
+      coins: 0, ownedEffects: ['none'], emailVerified: isOwner,
+      verificationHash, verificationExpiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      createdAt: new Date().toISOString()
+    };
     database.users.push(user);
     await persistDatabase();
     await establishSession(request, user.id);
     io.emit('user:joined', publicUser(user));
-    response.status(201).json({ user: publicUser(user) });
+    response.status(201).json({
+      user: publicUser(user),
+      requiresEmailVerification: !isOwner,
+      email,
+      verificationCode: process.env.NODE_ENV === 'production' ? undefined : verificationCode
+    });
+  } catch (error) { next(error); }
+});
+
+app.post('/api/verify-email', async (request, response, next) => {
+  try {
+    const email = typeof request.body.email === 'string' ? request.body.email.trim().toLowerCase() : '';
+    const code = typeof request.body.code === 'string' ? request.body.code.trim() : '';
+    const user = database.users.find((entry) => entry.email === email);
+    if (!user) return response.status(404).json({ error: 'Account not found.' });
+    if (!/^\d{6}$/.test(code)) return response.status(400).json({ error: 'Enter the 6-digit verification code.' });
+    if (!user.verificationHash || !user.verificationExpiresAt || Date.parse(user.verificationExpiresAt) <= Date.now()) {
+      return response.status(410).json({ error: 'Verification code expired. Request a new code.' });
+    }
+    const candidateHash = crypto.createHash('sha256').update(`${email}:${code}`).digest('hex');
+    const candidate = Buffer.from(candidateHash, 'hex');
+    const expected = Buffer.from(user.verificationHash, 'hex');
+    if (candidate.length !== expected.length || !crypto.timingSafeEqual(candidate, expected)) {
+      return response.status(400).json({ error: 'That verification code is incorrect.' });
+    }
+    user.emailVerified = true;
+    user.verificationHash = null;
+    user.verificationExpiresAt = null;
+    await persistDatabase();
+    await establishSession(request, user.id);
+    response.json({ user: publicUser(user) });
+  } catch (error) { next(error); }
+});
+
+app.post('/api/resend-verification', async (request, response, next) => {
+  try {
+    const email = typeof request.body.email === 'string' ? request.body.email.trim().toLowerCase() : '';
+    const user = database.users.find((entry) => entry.email === email);
+    if (!user) return response.status(404).json({ error: 'Account not found.' });
+    if (user.emailVerified) return response.json({ ok: true, emailVerified: true });
+    const verificationCode = String(crypto.randomInt(100000, 1000000));
+    user.verificationHash = crypto.createHash('sha256').update(`${email}:${verificationCode}`).digest('hex');
+    user.verificationExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    await persistDatabase();
+    response.json({ ok: true, verificationCode: process.env.NODE_ENV === 'production' ? undefined : verificationCode });
   } catch (error) { next(error); }
 });
 
@@ -400,6 +551,7 @@ app.post('/api/login', async (request, response, next) => {
     if (!user || password.length > 200) return response.status(401).json({ error: 'Email or password is incorrect.' });
     const candidate = await scrypt(password, user.salt, 64);
     if (!crypto.timingSafeEqual(candidate, Buffer.from(user.passwordHash, 'hex'))) return response.status(401).json({ error: 'Email or password is incorrect.' });
+    if (user.emailVerified === false) return response.status(403).json({ error: 'Verify your email before signing in.', requiresEmailVerification: true, email: user.email });
     let muteExpired = false;
     if (user.mutedUntil && Date.parse(user.mutedUntil) <= Date.now()) {
       user.mutedUntil = null;
@@ -422,6 +574,60 @@ app.post('/api/logout', (request, response, next) => {
 
 app.get('/api/users', requireUser, (request, response) => {
   response.json({ users: database.users.filter((user) => user.id !== request.user.id).map(publicUser), online: onlineUserIds() });
+});
+
+app.get('/api/friends', requireUser, (request, response) => {
+  const idsFor = (values) => values.map((id) => database.users.find((user) => user.id === id)).filter(Boolean).map(publicUser);
+  response.json({
+    friends: idsFor(request.user.friends),
+    incoming: idsFor(request.user.friendRequestsIn),
+    outgoing: idsFor(request.user.friendRequestsOut)
+  });
+});
+
+app.post('/api/friends/:userId/request', requireUser, async (request, response, next) => {
+  try {
+    const target = database.users.find((user) => user.id === request.params.userId);
+    if (!target || target.id === request.user.id) return response.status(404).json({ error: 'Person not found.' });
+    if (request.user.friends.includes(target.id)) return response.status(409).json({ error: 'You are already friends.' });
+    if (request.user.friendRequestsOut.includes(target.id)) return response.status(409).json({ error: 'Friend request already sent.' });
+    if (!request.user.friendRequestsOut.includes(target.id)) request.user.friendRequestsOut.push(target.id);
+    if (!target.friendRequestsIn.includes(request.user.id)) target.friendRequestsIn.push(request.user.id);
+    await persistDatabase();
+    io.to(`user:${target.id}`).emit('friend:request', { user: publicUser(request.user) });
+    io.emit('profile:update', publicUser(request.user));
+    io.emit('profile:update', publicUser(target));
+    response.json({ ok: true });
+  } catch (error) { next(error); }
+});
+
+app.post('/api/friends/:userId/accept', requireUser, async (request, response, next) => {
+  try {
+    const requester = database.users.find((user) => user.id === request.params.userId);
+    if (!requester || !request.user.friendRequestsIn.includes(requester.id)) return response.status(404).json({ error: 'Friend request not found.' });
+    request.user.friendRequestsIn = request.user.friendRequestsIn.filter((id) => id !== requester.id);
+    requester.friendRequestsOut = requester.friendRequestsOut.filter((id) => id !== request.user.id);
+    if (!request.user.friends.includes(requester.id)) request.user.friends.push(requester.id);
+    if (!requester.friends.includes(request.user.id)) requester.friends.push(request.user.id);
+    await persistDatabase();
+    io.to(`user:${requester.id}`).emit('friend:accepted', { user: publicUser(request.user) });
+    io.to(`user:${request.user.id}`).emit('friend:accepted', { user: publicUser(requester) });
+    io.emit('profile:update', publicUser(request.user));
+    io.emit('profile:update', publicUser(requester));
+    response.json({ ok: true, friendCount: request.user.friends.length });
+  } catch (error) { next(error); }
+});
+
+app.post('/api/friends/:userId/decline', requireUser, async (request, response, next) => {
+  try {
+    const requester = database.users.find((user) => user.id === request.params.userId);
+    request.user.friendRequestsIn = request.user.friendRequestsIn.filter((id) => id !== request.params.userId);
+    if (requester) requester.friendRequestsOut = requester.friendRequestsOut.filter((id) => id !== request.user.id);
+    await persistDatabase();
+    if (requester) io.to(`user:${requester.id}`).emit('friend:declined', { user: publicUser(request.user) });
+    io.emit('profile:update', publicUser(request.user));
+    response.json({ ok: true });
+  } catch (error) { next(error); }
 });
 
 app.post('/api/users/:userId/role', requireUser, async (request, response, next) => {
@@ -477,7 +683,21 @@ app.patch('/api/profile', requireUser, async (request, response, next) => {
     if (bio === undefined && avatarEffect === undefined && badge === undefined) return response.status(400).json({ error: 'There is nothing to update.' });
     if (bio !== undefined) request.user.bio = bio.trim();
     if (avatarEffect !== undefined) request.user.avatarEffect = avatarEffect;
-    if (badge !== undefined) request.user.badge = badge;
+    if (badge !== undefined) {
+      if (badge.startsWith('animated-')) {
+        request.user.ownedBadges ||= ['none'];
+        if (!request.user.ownedBadges.includes(badge)) {
+          const number = Number(badge.replace('animated-', '') || '0');
+          const badgePrice = 1500 + number * 10;
+          if (request.user.role !== 'owner') {
+            if ((request.user.coins || 0) < badgePrice) return response.status(402).json({ error: `You need ${badgePrice - (request.user.coins || 0)} more coins.` });
+            request.user.coins -= badgePrice;
+          }
+          request.user.ownedBadges.push(badge);
+        }
+      }
+      request.user.badge = badge;
+    }
     await persistDatabase();
     io.emit('profile:update', publicUser(request.user));
     response.json({ user: publicUser(request.user) });
@@ -500,7 +720,7 @@ app.post('/api/avatar', requireUser, parseAvatar, async (request, response, next
     if (process.env.CHATROOM_IMAGE_MODERATION_URL) {
       const verdict = await moderateImage(image, contentType);
       if (!verdict.available) return response.status(503).json({ error: 'Image moderation is unavailable. The image was not uploaded.' });
-      if (!verdict.safe) return response.status(422).json({ error: 'This image could not be approved for Chatroom.' });
+      if (!verdict.safe) return response.status(422).json({ error: 'This image could not be approved for Obsidian Chat.' });
     }
 
     const avatarDirectory = path.join(path.dirname(dataPath), 'avatars');
@@ -536,7 +756,7 @@ app.post('/api/banner', requireUser, parseBanner, async (request, response, next
     if (process.env.CHATROOM_IMAGE_MODERATION_URL) {
       const verdict = await moderateImage(image, contentType);
       if (!verdict.available) return response.status(503).json({ error: 'Image moderation is unavailable. The banner was not uploaded.' });
-      if (!verdict.safe) return response.status(422).json({ error: 'This banner could not be approved for Chatroom.' });
+      if (!verdict.safe) return response.status(422).json({ error: 'This banner could not be approved for Obsidian Chat.' });
     }
     const directory = path.join(path.dirname(dataPath), 'banners');
     await fs.mkdir(directory, { recursive: true });
@@ -544,7 +764,32 @@ app.post('/api/banner', requireUser, parseBanner, async (request, response, next
     await fs.writeFile(path.join(directory, filename), image, { flag: 'wx', mode: 0o600 });
     const previousBanner = request.user.banner;
     request.user.banner = filename;
+    request.user.bannerDecorationId = null;
     try { await persistDatabase(); } catch (error) { request.user.banner = previousBanner; await fs.unlink(path.join(directory, filename)).catch(() => {}); throw error; }
+    if (previousBanner) await fs.unlink(path.join(directory, previousBanner)).catch(() => {});
+    io.emit('profile:update', publicUser(request.user));
+    response.json({ user: publicUser(request.user) });
+  } catch (error) { next(error); }
+});
+
+app.post('/api/banner/gif', requireUser, async (request, response, next) => {
+  try {
+    const gif = findGif(request.body.gifId);
+    if (!gif) return response.status(404).json({ error: 'Banner animation not found.' });
+    const source = path.join(__dirname, 'public', 'gifs', ...gif.urlPath.split('/').map(decodeURIComponent));
+    const image = await fs.readFile(source);
+    if (!image.subarray(0, 6).toString('ascii').match(/^GIF8[79]a$/)) return response.status(422).json({ error: 'This animation is not a valid GIF.' });
+    const directory = path.join(path.dirname(dataPath), 'banners');
+    await fs.mkdir(directory, { recursive: true });
+    const filename = `${crypto.randomUUID()}.gif`;
+    await fs.writeFile(path.join(directory, filename), image, { flag: 'wx', mode: 0o600 });
+    const previousBanner = request.user.banner;
+    request.user.banner = filename;
+    try { await persistDatabase(); } catch (error) {
+      request.user.banner = previousBanner;
+      await fs.unlink(path.join(directory, filename)).catch(() => {});
+      throw error;
+    }
     if (previousBanner) await fs.unlink(path.join(directory, previousBanner)).catch(() => {});
     io.emit('profile:update', publicUser(request.user));
     response.json({ user: publicUser(request.user) });
@@ -585,7 +830,7 @@ app.post('/api/attachments', requireUser, parseImageUpload, async (request, resp
     if (!contentType || contentType !== request.headers['content-type']) return response.status(400).json({ error: 'The selected file is not a supported image.' });
     const verdict = await moderateImage(image, contentType);
     if (!verdict.available) return response.status(503).json({ error: 'Image moderation is unavailable. The image was not uploaded.' });
-    if (!verdict.safe) return response.status(422).json({ error: 'This image could not be approved for Chatroom.' });
+    if (!verdict.safe) return response.status(422).json({ error: 'This image could not be approved for Obsidian Chat.' });
 
     const id = crypto.randomUUID();
     const extension = contentType === 'image/jpeg' ? 'jpg' : contentType.split('/')[1];
@@ -650,6 +895,25 @@ app.get('/api/messages', requireUser, (request, response) => {
   response.json({ messages });
 });
 
+app.get('/api/dms', requireUser, (request, response) => {
+  const conversations = new Map();
+  for (const message of database.messages) {
+    if (message.type !== 'dm') continue;
+    let peerId = null;
+    if (message.userId === request.user.id) peerId = message.recipientId;
+    else if (message.recipientId === request.user.id) peerId = message.userId;
+    if (!peerId) continue;
+    if (!database.users.some((user) => user.id === peerId)) continue;
+    const previous = conversations.get(peerId);
+    if (!previous || String(message.createdAt) > String(previous.createdAt)) conversations.set(peerId, message);
+  }
+  const peers = [...conversations.entries()]
+    .map(([peerId, message]) => ({ peer: publicUser(database.users.find((user) => user.id === peerId)), lastMessage: dmMessage(message) }))
+    .filter((entry) => entry.peer && entry.lastMessage)
+    .sort((first, second) => String(second.lastMessage.createdAt).localeCompare(String(first.lastMessage.createdAt)));
+  response.json({ conversations: peers });
+});
+
 app.get('/api/dms/:userId', requireUser, (request, response) => {
   const peer = database.users.find((user) => user.id === request.params.userId);
   if (!peer || peer.id === request.user.id) return response.status(404).json({ error: 'Person not found.' });
@@ -660,7 +924,7 @@ app.get('/api/dms/:userId', requireUser, (request, response) => {
 
 io.engine.use(sessionMiddleware);
 io.use((socket, next) => {
-  if (!trustedGateway(socket.request)) return next(new Error('Chatroom is only available through the approved school network.'));
+  if (!trustedGateway(socket.request)) return next(new Error('Obsidian Chat is only available through the approved school network.'));
   const user = database.users.find((entry) => entry.id === socket.request.session?.userId);
   if (!user) return next(new Error('Authentication required.'));
   socket.userId = user.id;
@@ -729,7 +993,11 @@ io.on('connection', (socket) => {
     if (roomId === 'links' && !isRoomModerator(author)) return acknowledge({ error: 'Only Owner and Mods Can Send Messages Here.' });
     if (activeMute(author)) return acknowledge({ error: `You are muted until ${author.mutedUntil}.` });
     const gif = findGif(payload?.gifId);
-    if ((!isValidText(text, 3000) && !attachment && !gif) || text.length > 3000 || (text && hasBlockedLanguage(text)) || !socket.rooms.has(`room:${roomId}`)) return acknowledge({ error: 'Message could not be sent. Please keep it respectful.' });
+    if ((!isValidText(text, 3000) && !attachment && !gif) || text.length > 3000 || !socket.rooms.has(`room:${roomId}`)) return acknowledge({ error: 'Message could not be sent. Please keep it respectful.' });
+    if (text && hasBlockedLanguage(text)) {
+      await issueWarning(author, roomId, 'Blocked language rule match');
+      return acknowledge({ error: 'Warning issued by the moderation bot. Please keep chat respectful.' });
+    }
     if (roomId !== 'links' && text && containsLink(text)) return acknowledge({ error: 'Please send links in #links.' });
     if (roomId === 'voice') return acknowledge({ error: 'Voice rooms do not accept text messages.' });
     const mentionedUsers = usersMentionedIn(text, socket.userId);
@@ -802,7 +1070,11 @@ io.on('connection', (socket) => {
     const attachment = database.attachments.find((entry) => entry.id === payload?.attachmentId && entry.ownerId === socket.userId);
     if (activeMute(author)) return acknowledge({ error: `You are muted until ${author.mutedUntil}.` });
     const gif = findGif(payload?.gifId);
-    if (!peer || peer.id === socket.userId || (!isValidText(text, 3000) && !attachment && !gif) || text.length > 3000 || (text && hasBlockedLanguage(text))) return acknowledge({ error: 'Message could not be sent. Please keep it respectful.' });
+    if (!peer || peer.id === socket.userId || (!isValidText(text, 3000) && !attachment && !gif) || text.length > 3000) return acknowledge({ error: 'Message could not be sent. Please keep it respectful.' });
+    if (text && hasBlockedLanguage(text)) {
+      await issueWarning(author, 'general', 'Blocked language in direct message');
+      return acknowledge({ error: 'Warning issued by the moderation bot. Please keep chat respectful.' });
+    }
     const id = conversationId(socket.userId, peer.id);
     if (!socket.rooms.has(`dm:${id}`)) return acknowledge({ error: 'Open this conversation before sending a message.' });
     const message = { id: crypto.randomUUID(), type: 'dm', conversationId: id, userId: socket.userId, recipientId: peer.id, text, attachmentId: attachment?.id || null, gifUrl: gif ? `/gifs/${gif.urlPath}` : null, replyTo: typeof payload.replyTo === 'string' ? payload.replyTo : null, reactions: {}, createdAt: new Date().toISOString() };
@@ -830,9 +1102,10 @@ app.use((error, request, response, next) => {
 
 loadDatabase().then(async () => {
   await loadAvatarDecorations();
+  await loadBannerDecorations();
   await loadGifCatalog();
   server.listen(port, '0.0.0.0', () => {
-    console.log(`Chatroom is listening on http://localhost:${port}`);
+    console.log(`Obsidian Chat is listening on http://localhost:${port}`);
   });
 }).catch((error) => {
   console.error('Could not load chatroom data:', error);

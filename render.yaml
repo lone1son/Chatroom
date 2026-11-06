@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: chatroom
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 4173
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CHATROOM_DATA_PATH
+        value: /data/chatroom.json
+    disk:
+      name: chatroom-data
+      mountPath: /data
+      sizeGB: 1

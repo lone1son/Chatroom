@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#08090b">
-  <title>Chatroom — real people, real-time conversation</title>
+  <title>Obsidian Chat</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='12' fill='%230b0c0e'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='3' stroke-linejoin='round' d='M24 5 39 12.5 43 29 24 43 5 29 9 12.5 24 5Z'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' d='M14 23h20M18 17h12M18 29h12'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -130,6 +131,13 @@
     .date-divider { display: flex; align-items: center; gap: 12px; margin: 1px 0 24px; color: #8d949d; font-size: 10px; font-weight: 600; }
     .date-divider::before, .date-divider::after { height: 1px; flex: 1; background: #ffffff18; content: ''; }
     .message { position: relative; display: flex; gap: 11px; margin-bottom: 18px; animation: enter .2s ease both; }
+    .message.decorated-message { padding: 8px 10px 8px 6px; border-radius: 12px; isolation: isolate; }
+    .message.decorated-message::before {
+      position: absolute; inset: 0; z-index: -1; border-radius: 12px;
+      background-image: var(--message-decoration); background-size: 100% 100%; background-position: center;
+      background-repeat: no-repeat; content: ''; opacity: .88;
+      filter: saturate(1.12) contrast(1.08);
+    }
     .message > .person-avatar { width: 34px; height: 34px; flex-basis: 34px; font-size: 10px; }
     .message-body { min-width: 0; flex: 1; }
     .message-meta { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 5px; }
@@ -150,12 +158,18 @@
     .send-button { width: 31px; height: 29px; display: grid; place-items: center; border-radius: 6px; color: #d8ff64; cursor: pointer; }
     .send-button svg { width: 15px; height: 15px; }
     .composer-hint { margin: 7px 0 0; color: #858c95; font-size: 9px; text-align: center; }
+    .typing-indicator { height: 18px; display: flex; align-items: center; gap: 5px; margin: 0 4px 5px; color: var(--discord-muted); font-size: 13px; font-weight: 600; }
+    .typing-dots { display: inline-flex; align-items: center; gap: 3px; margin-left: 2px; }
+    .typing-dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--discord-muted); animation: typingBounce 1.1s infinite ease-in-out; }
+    .typing-dots span:nth-child(2) { animation-delay: .15s; }
+    .typing-dots span:nth-child(3) { animation-delay: .3s; }
+    @keyframes typingBounce { 0%, 60%, 100% { opacity: .35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-4px); } }
     .details-panel { display: flex; flex-direction: column; min-width: 0; overflow: auto; padding: 20px 16px; border-left: 1px solid #ffffff16; background: #0d0f11; }
     .details-heading { display: flex; align-items: center; justify-content: space-between; margin: 1px 0 17px; font: 600 14px 'Space Grotesk', sans-serif; }
     .details-section { margin-top: 19px; }
     .details-section-title { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px; font-size: 11px; font-weight: 700; }
     .room-footer { margin-top: auto; padding-top: 22px; color: #858c95; font-size: 9px; }
-    .mobile-menu { display: none; }
+    .mobile-menu { display: grid; }
     .signout-button { width: 100%; min-height: 38px; display: flex; flex: 0 0 38px; align-items: center; justify-content: flex-start; gap: 9px; margin: 4px 0 0; padding: 0 10px; color: #adb3bb; font-size: 11px; white-space: nowrap; }
     .icon-button { width: 34px; height: 34px; display: grid; flex: 0 0 34px; place-items: center; border: 1px solid #ffffff24; border-radius: 6px; background: #ffffff0b; color: #e6e8eb; cursor: pointer; }
     .icon-button svg { width: 17px; height: 17px; }
@@ -168,14 +182,10 @@
       .details-panel { display: none; }
     }
     @media (max-width: 760px) {
-      .app-shell { position: relative; grid-template-columns: 58px 1fr; min-height: 0; height: 100dvh; }
-      .server-rail { grid-column: 1; grid-row: 1; padding: 10px 5px; }
-      .server-mark, .server-button { width: 42px; height: 42px; flex-basis: 42px; border-radius: 13px; }
-      .server-mark { font-size: 17px; }
-      .server-divider { width: 28px; }
-      .sidebar { position: absolute; z-index: 5; top: 0; bottom: 0; left: 58px; width: min(78vw, 280px); box-shadow: 12px 0 35px #0009; transform: translateX(-115%); transition: transform .22s ease; }
+      .app-shell { position: relative; grid-template-columns: minmax(0, 1fr); min-height: 0; height: 100dvh; }
+      .sidebar { position: absolute; z-index: 5; top: 0; bottom: 0; left: 0; width: min(78vw, 280px); box-shadow: 12px 0 35px #0009; transform: translateX(-115%); transition: transform .22s ease; }
       .sidebar.open { transform: translateX(0); }
-      .chat-main { grid-column: 2; }
+      .chat-main { grid-column: 1; }
       .details-panel { display: none !important; }
       .sidebar-brand-row { height: 60px; }
       .sidebar.open { transform: translateX(0); }
@@ -252,9 +262,10 @@
     .modal::backdrop { background: #000a; backdrop-filter: blur(5px); }
     .modal { width: min(420px, calc(100% - 32px)); max-height: calc(100dvh - 28px); padding: 0; overflow: auto; border: 1px solid #ffffff25; border-radius: 10px; background: #141619; color: #f4f5f6; box-shadow: 0 30px 90px #000b; }
     .modal-content { padding: 24px; }
-    .modal-close { float: right; }
+    .modal-content { position: relative; }
+    .modal-close { position: absolute; top: 12px; right: 12px; z-index: 20; pointer-events: auto; }
     .modal-banner { width: calc(100% + 40px); height: 140px; margin: -20px -20px 14px; overflow: hidden; border-bottom: 1px solid #ffffff1a; background: #ffffff08 center/cover no-repeat; }
-    .modal-banner img { width: 100%; height: 100%; display: block; object-fit: cover; }
+    .modal-banner img { width: 100%; height: 100%; display: block; object-fit: fill; }
     #modalBanner { position: relative; }
     #modalBanner::after { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,.38)); content: ''; pointer-events: none; }
     animate-icons { display: inline-grid; width: 17px; height: 17px; place-items: center; }
@@ -267,9 +278,28 @@
     .modal-avatar .person-avatar { width: 66px; height: 66px; flex-basis: 66px; font-size: 16px; }
     .modal-name { margin-bottom: 6px; font: 600 22px 'Space Grotesk', sans-serif; }
     .modal-bio { min-height: 40px; margin: 0 0 22px; color: #afb4bb; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
-    .modal-actions { display: flex; gap: 8px; }
-    .modal-actions .primary-button { width: auto; flex: 1; min-height: 43px; font-size: 13px; }
-    .modal-actions .icon-button { min-width: 43px; }
+    .modal-friends { margin: -12px 0 18px; color: #c4cad2; font-size: 12px; font-weight: 700; }
+    .banner-animation-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; max-height: 260px; overflow: auto; margin-top: 10px; }
+    .banner-animation-grid .banner-animation-option { min-width: 0; height: 112px; display: grid; grid-template-rows: 78px auto; gap: 4px; padding: 4px; border: 1px solid #ffffff25; border-radius: 8px; background: #ffffff0b; color: #e7e9eb; cursor: pointer; }
+    .banner-animation-grid .banner-animation-option:hover { border-color: #d8ff64; background: #d8ff6414; }
+    .banner-animation-grid .banner-animation-option span { min-width: 0; overflow: hidden; font-size: 9px; font-weight: 800; line-height: 1.15; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+    .banner-animation-grid img { width: 100%; height: 78px; display: block; border-radius: 5px; object-fit: cover; }
+    @media (max-width: 760px) { .banner-animation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .friend-response-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .friend-response-actions button { width: 100%; min-height: 44px; }
+    .modal-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 8px; }
+    .modal-actions > .primary-button,
+    .modal-actions > #friendRequestButton,
+    .modal-actions > #saveBioButton,
+    .modal-actions > .friend-response-actions { grid-column: 1 / -1; width: 100%; }
+    .modal-actions > .primary-button,
+    .modal-actions > #friendRequestButton,
+    .modal-actions > .icon-button { width: 100%; min-width: 0; min-height: 44px; height: 44px; flex: none; padding: 10px 12px; font-size: 13px; }
+    .modal-actions #saveBioButton { grid-column: 1 / -1; }
+    .mute-profile-actions { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .mute-profile-actions button { width: 100%; height: 44px; min-width: 0; min-height: 44px !important; padding: 0 12px !important; }
+    #profileDialog button { backdrop-filter: none; -webkit-backdrop-filter: none; }
+    #profileDialog .primary-button:hover { transform: none; }
     .bio-editor { width: 100%; min-height: 110px; margin-bottom: 12px; padding: 11px; resize: vertical; border: 1px solid #ffffff25; border-radius: 6px; background: #ffffff0a; color: #fff; font: inherit; font-size: 13px; }
     .toast { background: #22262b; color: white; }
     .link-warning-title { margin: 3px 0 8px; font: 600 20px 'Space Grotesk', sans-serif; }
@@ -425,6 +455,16 @@
     .upload-button svg { width: 16px; height: 16px; color: #d8ff64; }
     .upload-hint { margin: 6px 0 16px; color: #858c94; font-size: 10px; text-align: center; }
     .studio-section-title { margin: 14px 0 8px; color: #d9dcdf; font-size: 11px; }
+    .studio-category-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 14px 0 10px; }
+    .studio-category-tab { min-height: 40px; border: 1px solid #ffffff20; border-radius: 8px; background: #ffffff08; color: #b7bdc3; font-size: 10px; font-weight: 800; cursor: pointer; }
+    .studio-category-tab.active { border-color: #5865f2; background: #5865f233; color: #fff; }
+    .studio-category-panel { display: block; }
+    .studio-category-panel[hidden] { display: none !important; }
+    .banner-decoration-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; max-height: 260px; overflow-y: auto; }
+    .banner-decoration-option { min-width: 0; height: 112px; display: grid; grid-template-rows: 78px auto; gap: 4px; padding: 4px; border: 1px solid #ffffff20; border-radius: 8px; background: #ffffff08; color: #b7bdc3; cursor: pointer; }
+    .banner-decoration-option img { width: 100%; height: 78px; object-fit: cover; border-radius: 5px; }
+    .banner-decoration-option span { min-width: 0; overflow: hidden; font-size: 8px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+    .banner-decoration-option.active { border-color: #5865f2; background: #5865f233; color: #fff; }
     .coin-balance { margin: 4px 0 0; color: #ffe08a; font-size: 11px; font-weight: 800; }
     .effect-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
     .effect-option { min-width: 0; display: grid; justify-items: center; gap: 4px; padding: 8px 3px; border: 1px solid #ffffff20; border-radius: 8px; background: #ffffff08; color: #b7bdc3; font-size: 8px; cursor: pointer; }
@@ -647,7 +687,11 @@
       to { box-shadow: 0 0 0 1px #ffffff99, 0 0 18px #ad78ffbb, 0 0 25px #54dfff66; }
     }
     @keyframes swatchBreathe { to { transform: scale(1.1); filter: brightness(1.35); } }
-    .app-shell { grid-template-columns: 68px 236px minmax(360px, 1fr) 224px; }
+    .app-shell { grid-template-columns: 236px minmax(360px, 1fr) 224px; }
+    .app-shell.sidebar-hidden { grid-template-columns: minmax(360px, 1fr) 224px; }
+    .app-shell.sidebar-hidden .sidebar { display: none; }
+    .app-shell.sidebar-hidden .chat-main { grid-column: 1; }
+    .messages { scroll-behavior: auto; }
     .server-rail { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; padding: 14px 8px; border-right: 1px solid #ffffff16; background: #08090b; }
     .server-mark { position: relative; width: 48px; height: 48px; display: grid; place-items: center; flex: 0 0 48px; border: 0; border-radius: 16px; background: #d8ff64; color: #0d1009; font: 800 20px 'Space Grotesk', sans-serif; cursor: pointer; transition: border-radius .18s ease, transform .18s ease; }
     .server-mark:hover, .server-mark.active { border-radius: 12px; transform: translateY(-1px); }
@@ -688,7 +732,8 @@
       flex: 0 0 auto;
     }
     @media (max-width: 1120px) {
-      .app-shell { grid-template-columns: 68px 236px minmax(360px, 1fr); }
+      .app-shell { grid-template-columns: 236px minmax(360px, 1fr); }
+      .app-shell.sidebar-hidden { grid-template-columns: minmax(360px, 1fr); }
       .details-panel { display: none !important; }
     }
     @media (max-width: 760px) {
@@ -703,12 +748,135 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
     }
+    /* Discord-style login and larger, readable chat typography */
+    .auth-shell { grid-template-columns: minmax(360px, 1fr) minmax(440px, 520px); background:
+      radial-gradient(circle at 20% 20%, #5865f219, transparent 28rem),
+      radial-gradient(circle at 82% 78%, #5865f211, transparent 32rem),
+      var(--discord-bg); }
+    .auth-main { order: 2; align-items: center; justify-content: center; padding: 28px 40px; }
+    .auth-main > .brand { position: absolute; top: 28px; right: 32px; }
+    .auth-aside { order: 1; display: flex; min-height: 100vh; background:
+      radial-gradient(circle at 65% 20%, #5865f245, transparent 14rem),
+      linear-gradient(135deg, #171a23 0%, #111318 100%); }
+    .auth-content { width: min(440px, calc(100vw - 80px)); margin: 0; padding: 34px; border-radius: 10px; background: var(--discord-panel); box-shadow: 0 16px 40px #0008; }
+    .auth-content h1 { margin: 10px 0 12px; font-size: 30px; text-align: center; }
+    .auth-content .step-label { width: 100%; justify-content: center; }
+    .auth-copy { max-width: none; margin-bottom: 22px; text-align: center; }
+    .auth-switch { margin-top: 16px; }
+    .field { margin: 14px 0; }
+    .field label, .field span { font-size: 14px; }
+    .field input { height: 52px; font-size: 15px; }
+    .auth-content .primary-button { height: 48px; font-size: 15px; }
+
+    .server-rail { border-right-color: var(--discord-deep); background: var(--discord-deep); }
+    .server-mark, .server-button.active { border-radius: 12px; background: var(--discord-blurple); color: #fff; }
+    .server-mark:hover { background: var(--discord-blurple); }
+    .server-button { border-color: transparent; background: var(--discord-panel); color: var(--discord-text); }
+    .server-button:hover { border-color: transparent; background: var(--discord-blurple); color: #fff; }
+    .server-divider { background: #35373c; }
+    .server-rail .server-avatar { box-shadow: 0 0 0 3px var(--discord-deep); }
+    .profile-status > span:first-child { background: #23a55a; }
+    .send-button { color: #fff; }
+
+    .side-label { font-size: 12px; }
+    .channel-name { font-size: 15px; }
+    .person-name { font-size: 14px; }
+    .person-status { font-size: 11px; }
+    .chat-title { font-size: 18px; }
+    .chat-subtitle { font-size: 12px; }
+    .member-count { font-size: 12px; }
+    .message-author { font-size: 17px; font-weight: 800; }
+    .message-time { font-size: 11px; }
+    .message-text { font-size: 15px; line-height: 1.55; }
+    .composer input { height: 50px; font-size: 15px; }
+    .composer-hint { font-size: 11px; }
+    .details-heading { font-size: 16px; }
+    .details-section-title { font-size: 13px; }
+    .room-footer, .people-summary { font-size: 11px; }
+    .reaction { font-size: 12px; }
+    .profile-name { font-size: 13px; }
+    .profile-status { font-size: 11px; }
+
+    @media (max-width: 760px) {
+      .auth-shell { grid-template-columns: 1fr; }
+      .auth-aside { display: none; }
+      .auth-main { order: 1; padding: 28px 20px; }
+      .auth-main > .brand { position: static; margin-bottom: 18px; }
+      .auth-content { padding: 24px 20px; }
+      .auth-content h1 { font-size: 27px; }
+      .message-text { font-size: 14px; }
+      .channel-name { font-size: 14px; }
+    }
+    .dm-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+    .dm-button { position: relative; width: 100%; min-height: 42px; display: flex; align-items: center; gap: 10px; padding: 5px 8px; border: 0; border-radius: 4px; background: transparent; color: var(--discord-muted); text-align: left; cursor: pointer; }
+    .dm-button:hover, .dm-button.active { background: var(--discord-hover); color: #fff; }
+    .dm-button .person-avatar { width: 30px; height: 30px; flex-basis: 30px; }
+    .dm-name { flex: 1; overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+    .dm-unread-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #f23f42; box-shadow: 0 0 0 2px var(--discord-panel); }
+    .message-avatar-button { width: 34px; height: 34px; flex: 0 0 34px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+    .message-avatar-button .person-avatar { width: 34px; height: 34px; }
+    #profileDialog .modal-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: stretch;
+      gap: 8px;
+    }
+    #profileDialog .modal-actions > .primary-button,
+    #profileDialog .modal-actions > #friendRequestButton,
+    #profileDialog .modal-actions > #saveBioButton,
+    #profileDialog .modal-actions > .friend-response-actions {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
+    #profileDialog .modal-actions > .icon-button {
+      width: 100%;
+      min-width: 0;
+      height: 44px;
+      min-height: 44px;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 10px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      transform: none;
+    }
+    #profileDialog .modal-actions > .icon-button .button-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #profileDialog .mute-profile-actions { grid-column: 1 / -1; width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    #profileDialog .mute-profile-actions > .icon-button { width: 100%; height: 44px; min-width: 0; min-height: 44px; padding: 0 12px; }
+    #profileDialog button { transform: none !important; }
+    #profileDialog button:not(:disabled) { cursor: pointer; }
+    #profileDialog button:disabled { cursor: default; opacity: 0.65; }
+    #profileDialog #messageUserButton { border-color: #7c87ff; background: #5865f2; color: #fff; }
+    #profileDialog #messageUserButton:hover { border-color: #99a2ff; background: #6977f7; }
+    #profileDialog #editBioButton { border-color: #bd9a52; background: #68532e; color: #fff4c7; }
+    #profileDialog #customizeAvatarButton { border-color: #b980cc; background: #684175; color: #faeaff; }
+    #profileDialog #saveBioButton { border-color: #5d9ed6; background: #326a96; color: #fff; }
+    #profileDialog #promoteUserButton { border-color: #4d9d72; background: #236b48; color: #eafff4; }
+    #profileDialog #muteUserButton { border-color: #bd6565; background: #813838; color: #fff4f4; }
+    #profileDialog .icon-button[hidden],
+    #profileDialog .primary-button[hidden] { display: none !important; }
+    #profileDialog #editBioButton,
+    #profileDialog #customizeAvatarButton,
+    #profileDialog #saveBioButton { pointer-events: auto; cursor: pointer; position: relative; z-index: 3; }
+    @media (max-width: 760px) {
+      #profileDialog .modal-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #profileDialog .mute-profile-actions { grid-template-columns: 1fr 1fr; }
+    }
   </style>
 </head>
 <body>
   <main id="authShell" class="auth-shell">
     <section class="auth-main">
-      <a class="brand" href="#" aria-label="Chatroom home"><span class="brand-mark"><i data-lucide="messages-square"></i></span><span>Chatroom</span></a>
+      <a class="brand" href="#" aria-label="Obsidian Chat home"><span class="brand-mark"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" d="M24 5 39 12.5 43 29 24 43 5 29 9 12.5 24 5Z"/><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M14 23h20M18 17h12M18 29h12"/></svg></span><span>Obsidian Chat</span></a>
       <div id="welcomeScreen" class="auth-content">
         <span class="step-label"><span class="step-dot"></span> REAL PEOPLE. REAL-TIME.</span>
         <h1>Your people,<br>in one place.</h1>
@@ -733,15 +901,27 @@
         <p id="formSwitch" class="auth-switch">Already have an account? <button id="formLogin" class="text-button" type="button">Sign in</button></p>
         <div class="auth-note"><i data-lucide="shield-check"></i> Your password is securely hashed.</div>
       </div>
+      <div id="verificationScreen" class="auth-content" hidden>
+        <button id="verificationBack" class="back-link" type="button"><i data-lucide="arrow-left"></i> Back to sign in</button>
+        <span class="step-label"><span class="step-dot"></span> ONE LAST STEP</span>
+        <h1>Verify your email.</h1>
+        <p id="verificationCopy" class="auth-copy">Enter the 6-digit code sent to your email.</p>
+        <form id="verificationForm">
+          <label class="field"><span>Verification code</span><input id="verificationCodeInput" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000" required></label>
+          <p id="verificationError" class="form-error" role="alert"></p>
+          <button id="verifyEmailButton" class="primary-button" type="submit">Verify email <i data-lucide="arrow-right"></i></button>
+        </form>
+        <p class="auth-switch">Didn't receive it? <button id="resendVerification" class="text-button" type="button">Send a new code</button></p>
+      </div>
     </section>
-    <aside class="auth-aside" aria-label="Chatroom preview">
+    <aside class="auth-aside" aria-label="Obsidian Chat preview">
       <div class="aside-top">A space for real people</div>
       <div class="aside-art">
-        <p class="art-kicker">CHATROOM / 001</p>
+        <p class="art-kicker">OBSIDIAN CHAT / 001</p>
         <h2 class="art-title">A little less noise. A lot more real.</h2>
-        <div class="screenshot-stack" aria-label="Chatroom screenshots">
-          <section class="ui-shot room-shot" aria-label="Chatroom room view preview">
-            <div class="shot-topbar"><span class="shot-brand"><span class="shot-brand-mark">C</span> Chatroom</span><span class="shot-live"><i></i> LIVE</span></div>
+        <div class="screenshot-stack" aria-label="Obsidian Chat screenshots">
+          <section class="ui-shot room-shot" aria-label="Obsidian Chat room view preview">
+            <div class="shot-topbar"><span class="shot-brand"><span class="shot-brand-mark">O</span> Obsidian Chat</span><span class="shot-live"><i></i> LIVE</span></div>
             <div class="shot-body">
               <aside class="shot-sidebar"><span class="shot-label">ROOMS</span><span class="shot-room active"># general</span><span class="shot-room"># your-room</span><span class="shot-label shot-people-label">PEOPLE</span><span class="shot-placeholder"></span><span class="shot-placeholder short"></span></aside>
               <div class="shot-conversation"><div class="shot-room-title"># general <span>ROOM CHAT</span></div><div class="shot-empty"><i data-lucide="messages-square"></i><strong>Your room starts here.</strong><span>Conversations appear as your people arrive.</span></div><div class="shot-compose">Message # general <span>↑</span></div></div>
@@ -759,24 +939,19 @@
   </main>
 
   <main id="appShell" class="app-shell" hidden>
-    <aside class="server-rail" aria-label="Chatroom navigation">
-      <button id="serverHomeButton" class="server-mark active" aria-label="Open general room">C</button>
-      <span class="server-divider"></span>
-      <button id="serverRoomButton" class="server-button active" aria-label="Open rooms"><span>#</span></button>
-      <button id="serverPeopleButton" class="server-button people-button" aria-label="View people"><i class="fa-solid fa-users"></i></button>
-      <button id="serverProfileButton" class="server-avatar" aria-label="Open your profile"></button>
-    </aside>
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-brand-row">
-        <a class="brand" href="#" aria-label="Chatroom home"><span class="brand-mark"><i data-lucide="messages-square"></i></span><span>Chatroom</span></a>
+        <a class="brand" href="#" aria-label="Obsidian Chat home"><span class="brand-mark"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" d="M24 5 39 12.5 43 29 24 43 5 29 9 12.5 24 5Z"/><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M14 23h20M18 17h12M18 29h12"/></svg></span><span>Obsidian Chat</span></a>
         <button id="closeSidebar" class="icon-button has-label" type="button" aria-label="Close navigation"><i data-lucide="panel-left-close"></i><span class="button-label">Hide</span></button>
       </div>
       <button id="workspaceButton" class="workspace-button" type="button" aria-label="Open workspace rooms">
-        <span class="workspace-logo">C</span><span class="workspace-details"><span class="workspace-name">Chatroom</span><span class="workspace-sub">Real people, live</span></span><span class="button-label">Change</span>
+        <span class="workspace-logo"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" d="M24 5 39 12.5 43 29 24 43 5 29 9 12.5 24 5Z"/><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" d="M14 23h20M18 17h12M18 29h12"/></svg></span><span class="workspace-details"><span class="workspace-name">Obsidian Chat</span><span class="workspace-sub">Real people, live</span></span><span class="button-label">Change</span>
       </button>
       <div class="sidebar-scroll">
         <div class="side-label">Your rooms <button id="newRoomButton" class="icon-button has-label" aria-label="Create a room"><animate-icons name="plus" size="17" color="currentColor"></animate-icons><span class="button-label">Add</span></button></div>
         <ul id="channelList" class="nav-list"></ul>
+        <div class="side-label section-gap">DM's</div>
+        <ul id="dmList" class="dm-list"></ul>
         <div class="side-label section-gap">Your people</div>
         <ul id="peopleList" class="nav-list"></ul>
         <div class="side-label section-gap">Voice rooms</div>
@@ -799,31 +974,57 @@
         <div id="remoteAudios"></div>
       </section>
       <section id="messages" class="messages" aria-live="polite" aria-label="Room messages"></section>
-      <div id="composerWrap" class="composer-wrap"><div id="gifPicker" class="gif-picker" hidden></div><div id="mentionSuggestions" class="mention-suggestions" role="listbox" aria-label="Mention a person" hidden></div><div id="replyPreview" class="reply-preview" hidden></div><form id="messageForm" class="composer"><input id="messageInput" autocomplete="off" aria-label="Write a message" placeholder="Message # general"><div class="composer-tools"><div class="tool-row"><button type="button" class="icon-button has-label" aria-label="Add emoji" id="emojiButton"><i data-lucide="smile"></i><span class="button-label">Emoji</span></button><button type="button" class="icon-button has-label" id="gifButton"><i class="fa-solid fa-film"></i><span class="button-label">GIF</span></button><button type="button" class="icon-button has-label" id="imageButton"><i class="fa-solid fa-image"></i><span class="button-label">Image</span></button><input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></div><button class="send-button has-label" type="submit" aria-label="Send message"><animate-icons name="send" size="17" color="currentColor"></animate-icons><span class="button-label">Send</span></button></div></form><p class="composer-hint">Only signed-in people can read and write here.</p></div>
+      <div id="composerWrap" class="composer-wrap">
+        <div id="gifPicker" class="gif-picker" hidden></div>
+        <div id="mentionSuggestions" class="mention-suggestions" role="listbox" aria-label="Mention a person" hidden></div>
+        <div id="replyPreview" class="reply-preview" hidden></div>
+        <div id="typingIndicator" class="typing-indicator" aria-live="polite" hidden></div>
+        <form id="messageForm" class="composer">
+          <input id="messageInput" autocomplete="off" aria-label="Write a message" placeholder="Message # general">
+          <div class="composer-tools">
+            <div class="tool-row">
+              <button type="button" class="icon-button has-label" aria-label="Add emoji" id="emojiButton"><i data-lucide="smile"></i><span class="button-label">Emoji</span></button>
+              <button type="button" class="icon-button has-label" id="gifButton"><i class="fa-solid fa-film"></i><span class="button-label">GIF</span></button>
+              <button type="button" class="icon-button has-label" id="imageButton"><i class="fa-solid fa-image"></i><span class="button-label">Image</span></button>
+              <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+            </div>
+            <button class="send-button has-label" type="submit" aria-label="Send message"><animate-icons name="send" size="17" color="currentColor"></animate-icons><span class="button-label">Send</span></button>
+          </div>
+        </form>
+        <p class="composer-hint">Only signed-in people can read and write here.</p>
+      </div>
     </section>
-    <aside class="details-panel"><h2 class="details-heading">Room details</h2><section class="details-section"><h3 class="details-section-title">Online now <span id="onlineCount">0</span></h3><div id="onlineMembers"></div></section><section class="details-section"><h3 class="details-section-title">People in Chatroom</h3><p id="peopleSummary" class="room-footer">Registered members appear here.</p></section><p class="room-footer">Private conversations, shared in real time.</p></aside>
+    <aside class="details-panel"><h2 class="details-heading">Room details</h2><section class="details-section"><h3 class="details-section-title">Online now <span id="onlineCount">0</span></h3><div id="onlineMembers"></div></section><section class="details-section"><h3 class="details-section-title">People in Obsidian Chat</h3><p id="peopleSummary" class="room-footer">Registered members appear here.</p></section><p class="room-footer">Private conversations, shared in real time.</p></aside>
   </main>
   <main id="muteScreen" class="mute-screen" hidden><h1>You Have Been Muted</h1><p id="muteReason">A moderator paused your messages.</p><span id="muteCountdown" class="mute-timer">0:00</span><p>You can chat again when the timer reaches zero.</p></main>
   <div id="voiceNotice" class="voice-notice" role="status" hidden><span id="voiceNoticeText"></span><button id="voiceNoticeJoin" class="primary-button" type="button">Join call</button><button id="voiceNoticeIgnore" class="icon-button" type="button">Dismiss</button></div>
   <div id="mentionNotice" class="mention-notice" role="status" hidden><span id="mentionNoticeText" class="mention-notice-text"></span><button id="mentionNoticeOpen" class="primary-button" type="button">Open room</button><button id="mentionNoticeDismiss" class="icon-button" type="button" aria-label="Dismiss mention">×</button></div>
   <dialog id="profileDialog" class="modal">
     <div class="modal-content">
-      <button id="closeProfile" class="icon-button has-label modal-close" aria-label="Close profile"><i data-lucide="x"></i><span class="button-label">Close</span></button>
+      <button id="closeProfile" class="icon-button has-label modal-close" type="button" aria-label="Close profile"><i data-lucide="x"></i><span class="button-label">Close</span></button>
       <section id="profileView">
         <div id="modalBanner" class="modal-banner" hidden></div>
         <div id="modalAvatar" class="modal-avatar"></div>
         <h2 id="modalName" class="modal-name"></h2>
         <div id="modalBadge"></div>
+        <p id="modalFriends" class="modal-friends"></p>
         <p id="modalBio" class="modal-bio"></p>
         <textarea id="bioEditor" class="bio-editor" maxlength="240" placeholder="A little about you..." hidden></textarea>
         <div id="bannerEditor" class="banner-editor" hidden>
           <input id="bannerFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
-          <button id="chooseBannerButton" class="upload-button" type="button"><i data-lucide="image-plus"></i> Set banner image or GIF</button>
+          <button id="chooseBannerButton" class="upload-button" type="button"><i data-lucide="image-plus"></i> Choose profile banner</button>
           <p class="upload-hint">Up to 50 MB · JPG, PNG, WebP, or GIF</p>
+          <button id="browseBannerAnimations" class="upload-button" type="button">Explore banner animations</button>
+          <div id="bannerAnimationGrid" class="banner-animation-grid" hidden></div>
         </div>
         <p id="modalError" class="form-error" role="alert"></p>
         <div class="modal-actions">
           <button id="messageUserButton" class="primary-button" type="button"><i data-lucide="message-circle"></i> Message</button>
+          <button id="friendRequestButton" class="icon-button" type="button" hidden>Add Friend</button>
+          <div id="friendResponseActions" class="friend-response-actions" hidden>
+            <button id="acceptFriendButton" class="icon-button" type="button">Accept</button>
+            <button id="declineFriendButton" class="icon-button" type="button">Decline</button>
+          </div>
           <button id="editBioButton" class="icon-button has-label" type="button" aria-label="Edit bio"><i data-lucide="pencil"></i><span class="button-label">Edit bio</span></button>
           <button id="customizeAvatarButton" class="icon-button has-label" type="button" aria-label="Customize avatar"><i data-lucide="sparkles"></i><span class="button-label">Avatar style</span></button>
           <div class="mute-profile-actions"><button id="promoteUserButton" class="icon-button" type="button">Make Mod</button><button id="muteUserButton" class="icon-button" type="button">Mute</button></div>
@@ -832,14 +1033,27 @@
       </section>
       <section id="customizerView" class="customizer-view" hidden>
         <button id="backToProfile" class="back-link"><i data-lucide="arrow-left"></i> Profile</button>
-        <div class="customizer-heading"><div><p class="art-kicker">MAKE IT YOURS</p><h2>Avatar studio</h2><p class="coin-balance"><span id="coinBalance">0</span> coins</p></div><div id="avatarPreview" class="avatar-preview-large"></div></div>
+        <div class="customizer-heading"><div><p class="art-kicker">AVATAR SHOP</p><h2>Avatar studio</h2><p class="coin-balance"><span id="coinBalance">0</span> coins</p></div><div id="avatarPreview" class="avatar-preview-large"></div></div>
         <input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
         <button id="chooseAvatarButton" class="upload-button" type="button"><i data-lucide="image-up"></i> Choose photo or GIF from device</button>
         <p class="upload-hint">JPG, PNG, WebP, or GIF · up to 50 MB</p>
-        <h3 class="studio-section-title">Effects</h3>
-        <div id="effectOptions" class="effect-options"></div>
-        <h3 class="studio-section-title">Name badge</h3>
-        <div id="badgeOptions" class="badge-options"></div>
+        <div class="studio-category-tabs" role="tablist" aria-label="Avatar customization categories">
+          <button class="studio-category-tab active" type="button" role="tab" data-customization-category="avatar" aria-selected="true">Avatar Decorations</button>
+          <button class="studio-category-tab" type="button" role="tab" data-customization-category="banner" aria-selected="false">Banner Decorations</button>
+          <button class="studio-category-tab" type="button" role="tab" data-customization-category="badges" aria-selected="false">Badges</button>
+        </div>
+        <section class="studio-category-panel" data-customization-panel="avatar">
+          <h3 class="studio-section-title">Avatar Decorations</h3>
+          <div id="effectOptions" class="effect-options"></div>
+        </section>
+        <section class="studio-category-panel" data-customization-panel="banner" hidden>
+          <h3 class="studio-section-title">Banner Decorations</h3>
+          <div id="bannerDecorationOptions" class="banner-decoration-options"></div>
+        </section>
+        <section class="studio-category-panel" data-customization-panel="badges" hidden>
+          <h3 class="studio-section-title">Badges</h3>
+          <div id="badgeOptions" class="badge-options"></div>
+        </section>
         <p id="customizerError" class="form-error" role="alert"></p>
         <button id="saveAvatarButton" class="primary-button" type="button">Save look</button>
       </section>
@@ -847,21 +1061,21 @@
   </dialog>
   <dialog id="decorationBuyDialog" class="modal" aria-labelledby="decorationBuyTitle">
     <div class="modal-content decoration-buy-content">
-      <button id="closeDecorationBuy" class="icon-button modal-close" type="button" aria-label="Close">×</button>
+      <button id="closeDecorationBuy" class="icon-button modal-close" type="button" aria-label="Close decoration selection">×</button>
       <img id="decorationBuyPreview" class="decoration-buy-preview" alt="">
       <p id="decorationBuyRarity" class="art-kicker">RARITY</p>
       <h2 id="decorationBuyTitle" class="modal-name">Avatar decoration</h2>
       <p id="decorationBuyCoins" class="decoration-buy-coins">Your coins: 0</p>
       <p id="decorationBuyStatus" class="decoration-buy-status"></p>
       <div class="decoration-buy-actions">
-        <button id="decorationBuyCancel" class="icon-button" type="button">Cancel</button>
-        <button id="decorationBuyConfirm" class="primary-button" type="button">Buy</button>
+        <button id="decorationBuyCancel" class="icon-button" type="button">Keep current</button>
+        <button id="decorationBuyConfirm" class="primary-button" type="button">Use decoration</button>
       </div>
     </div>
   </dialog>
   <dialog id="linkWarningDialog" class="modal" aria-labelledby="linkWarningTitle">
     <div class="modal-content">
-      <h2 id="linkWarningTitle" class="link-warning-title">Leaving Chatroom?</h2>
+      <h2 id="linkWarningTitle" class="link-warning-title">Leaving Obsidian Chat?</h2>
       <p class="link-warning-copy">Only continue if you trust the person who shared this link.</p>
       <a id="externalLinkAddress" class="link-warning-url" href="#" rel="nofollow"></a>
       <div class="link-warning-actions">

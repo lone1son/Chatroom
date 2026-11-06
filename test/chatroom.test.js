@@ -259,7 +259,7 @@ test('authenticated people can chat and DM in real time', { timeout: 30000 }, as
   assert.equal(gifMessage.message.gifUrl, '/gifs/Approved/yay.gif');
 
   const savedHistory = await fetch(`${url}/api/messages?room=general`, { headers: { Cookie: alice.cookie } });
-  const messages = (await savedHistory.json()).messages;
+  const messages = (await savedHistory.json()).messages.filter((message) => message.user?.role !== 'system');
   assert.equal(messages.length, 4);
   assert.deepEqual(messages[0].reactions['👋'], [bob.id]);
   assert.equal(messages[1].replyTo, messages[0].id);

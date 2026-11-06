@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <rect width="1200" height="720" fill="#090a0c"/>
+  <rect width="260" height="720" fill="#0e1012" stroke="#ffffff16"/>
+  <rect x="260" width="720" height="720" fill="#090a0c"/>
+  <rect x="980" width="220" height="720" fill="#0d0f11" stroke="#ffffff16"/>
+  <rect x="18" y="18" width="224" height="48" rx="10" fill="#ffffff0d"/>
+  <circle cx="45" cy="42" r="15" fill="#d8ff64"/>
+  <text x="70" y="48" fill="#fff" font-family="Arial,sans-serif" font-size="18" font-weight="700">Chatroom</text>
+  <text x="30" y="100" fill="#8d949d" font-family="Arial,sans-serif" font-size="11" font-weight="700">ROOMS</text>
+  <rect x="18" y="116" width="224" height="38" rx="8" fill="#d8ff6418"/>
+  <text x="38" y="141" fill="#e8ffb9" font-family="Arial,sans-serif" font-size="15"># general</text>
+  <text x="38" y="177" fill="#c5c8cd" font-family="Arial,sans-serif" font-size="15"># links</text>
+  <text x="30" y="220" fill="#8d949d" font-family="Arial,sans-serif" font-size="11" font-weight="700">DM'S</text>
+  <circle cx="40" cy="252" r="14" fill="#aacafa"/>
+  <text x="34" y="258" fill="#1d2722" font-family="Arial,sans-serif" font-size="13" font-weight="700">A</text>
+  <text x="62" y="257" fill="#c5c8cd" font-family="Arial,sans-serif" font-size="14">Alex Morgan</text>
+  <circle cx="226" cy="252" r="5" fill="#d8ff64"/>
+  <circle cx="40" cy="292" r="14" fill="#d9cdfc"/>
+  <text x="34" y="298" fill="#1d2722" font-family="Arial,sans-serif" font-size="13" font-weight="700">J</text>
+  <text x="62" y="297" fill="#c5c8cd" font-family="Arial,sans-serif" font-size="14">Jamie Lee</text>
+  <rect x="260" y="0" width="720" height="64" fill="#0d0f11" stroke="#ffffff16"/>
+  <text x="286" y="39" fill="#fff" font-family="Arial,sans-serif" font-size="17" font-weight="700"># general</text>
+  <circle cx="920" cy="32" r="9" fill="#43b581"/>
+  <circle cx="308" cy="122" r="24" fill="#aacafa"/>
+  <text x="298" y="130" fill="#1d2722" font-family="Arial,sans-serif" font-size="18" font-weight="700">A</text>
+  <text x="344" y="112" fill="#fff" font-family="Arial,sans-serif" font-size="17" font-weight="700">Alex Morgan</text>
+  <text x="344" y="138" fill="#b9bec4" font-family="Arial,sans-serif" font-size="15">Welcome to the general room. Everything is synced live.</text>
+  <circle cx="308" cy="206" r="24" fill="#d9cdfc"/>
+  <text x="298" y="214" fill="#1d2722" font-family="Arial,sans-serif" font-size="18" font-weight="700">J</text>
+  <text x="344" y="196" fill="#fff" font-family="Arial,sans-serif" font-size="17" font-weight="700">Jamie Lee</text>
+  <text x="344" y="222" fill="#b9bec4" font-family="Arial,sans-serif" font-size="15">Anyone up for a voice chat?</text>
+  <rect x="344" y="246" width="112" height="38" rx="8" fill="#ffffff0d"/>
+  <text x="360" y="270" fill="#43b581" font-family="Arial,sans-serif" font-size="14">Join voice</text>
+  <text x="344" y="344" fill="#9fabb7" font-family="Arial,sans-serif" font-size="14">Alex Morgan is typing...</text>
+  <rect x="282" y="640" width="676" height="56" rx="10" fill="#17191c" stroke="#ffffff25"/>
+  <text x="302" y="674" fill="#858c94" font-family="Arial,sans-serif" font-size="14">Message #general</text>
+  <circle cx="914" cy="668" r="18" fill="#d8ff64"/>
+  <text x="908" y="674" fill="#1d2722" font-family="Arial,sans-serif" font-size="18">↑</text>
+  <text x="1000" y="100" fill="#8d949d" font-family="Arial,sans-serif" font-size="11" font-weight="700">MEMBERS — 4</text>
+  <circle cx="1012" cy="140" r="16" fill="#aacafa"/>
+  <text x="1040" y="145" fill="#c5c8cd" font-family="Arial,sans-serif" font-size="14">Alex Morgan</text>
+  <circle cx="1012" cy="184" r="16" fill="#d9cdfc"/>
+  <text x="1040" y="189" fill="#c5c8cd" font-family="Arial,sans-serif" font-size="14">Jamie Lee</text>
+  <circle cx="1012" cy="228" r="16" fill="#ff8874"/>
+  <text x="1040" y="233" fill="#c5c8cd" font-family="Arial,sans-serif" font-size="14">Morgan</text>
+</svg>
